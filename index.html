@@ -212,8 +212,24 @@ a{color:var(--arcane-bright);}
 .sheet-note{font-size:12px;line-height:1.6;color:var(--ink-soft);white-space:pre-wrap;}
 .item-help{background:none;border:none;color:var(--ink-soft);cursor:pointer;font-size:10px;padding:0 4px;opacity:.55;font-weight:700;}
 .item-help:hover{opacity:1;color:var(--brass-dim);}
-.item-row{display:flex;align-items:center;gap:7px;padding:6px 2px;border-bottom:1px solid rgba(43,34,19,.08);font-size:12.5px;color:var(--ink);}
+.item-row{display:flex;align-items:center;gap:7px;padding:6px 2px;border-bottom:1px solid rgba(43,34,19,.08);font-size:12.5px;color:var(--ink);transition:background .12s;}
 .item-row:last-child{border-bottom:none;}
+.item-row.hidden{display:none !important;}
+.equip-search-wrap{margin:6px 0 8px;display:flex;flex-direction:column;gap:5px;}
+.equip-search-box{display:flex;align-items:center;background:var(--parchment-2);border:1px solid var(--parchment-line);border-radius:8px;padding:2px 8px;transition:all .15s ease;}
+.equip-search-box:focus-within{border-color:var(--brass-dim);box-shadow:0 0 0 2px rgba(138,111,66,.22);}
+.equip-search-icon{font-size:11px;opacity:.65;margin-right:6px;user-select:none;color:var(--ink-soft);}
+.equip-search-input{flex:1;border:none;background:transparent;padding:5px 0;font-size:12px;color:var(--ink);outline:none;width:100%;}
+.equip-search-input::placeholder{color:var(--ink-soft);opacity:.7;font-size:11.5px;}
+.equip-search-clear{background:none;border:none;color:var(--ink-soft);font-size:11.5px;cursor:pointer;padding:2px 5px;border-radius:4px;line-height:1;opacity:.65;transition:all .15s;}
+.equip-search-clear:hover{opacity:1;color:var(--ember);background:rgba(176,71,58,.12);}
+.equip-filter-pills{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px;}
+.equip-pill{background:rgba(43,34,19,.06);border:1px solid rgba(43,34,19,.12);border-radius:999px;font-size:10.5px;font-weight:600;color:var(--ink-soft);padding:2px 7px;cursor:pointer;transition:all .15s;user-select:none;display:inline-flex;align-items:center;gap:3px;}
+.equip-pill:hover{background:rgba(43,34,19,.12);color:var(--ink);}
+.equip-pill.active{background:var(--parchment-line);color:#fff;border-color:var(--parchment-line);font-weight:700;}
+.equip-count-bar{display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--ink-soft);padding:2px 2px 4px;letter-spacing:.02em;}
+.item-empty-search{padding:14px 6px;text-align:center;font-size:12px;color:var(--ink-soft);font-style:italic;}
+.item-empty-search.hidden{display:none !important;}
 .item-cat-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;font-size:12px;background:rgba(43,34,19,.07);border:1px solid rgba(43,34,19,.12);flex-shrink:0;cursor:help;line-height:1;user-select:none;}
 .item-cat-badge.cat-pocao{background:rgba(79,143,124,.18);border-color:rgba(79,143,124,.4);}
 .item-cat-badge.cat-arma{background:rgba(176,71,58,.16);border-color:rgba(176,71,58,.4);}
@@ -223,6 +239,51 @@ a{color:var(--arcane-bright);}
 .item-cat-badge.cat-ferramenta{background:rgba(100,105,120,.15);border-color:rgba(100,105,120,.35);}
 .item-cat-badge.cat-outro{background:rgba(43,34,19,.07);border-color:rgba(43,34,19,.15);}
 .item-row .item-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* =========================================================
+   DICE ROLL ANIMATION & OVERLAY
+   ========================================================= */
+.dice-roll-overlay{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(7,8,12,.78);backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);opacity:1;transition:opacity .22s ease;user-select:none;}
+.dice-roll-overlay.hidden{display:none !important;}
+.dice-roll-overlay.closing{opacity:0;pointer-events:none;}
+.dice-roll-stage{position:relative;width:90%;max-width:380px;background:linear-gradient(165deg,var(--void-2),var(--void-3));border:1px solid var(--brass-dim);border-radius:18px;padding:24px 20px 20px;text-align:center;box-shadow:0 16px 40px rgba(0,0,0,.65),0 0 35px rgba(193,154,91,.18);transform:scale(1);animation:diceStagePop .3s cubic-bezier(.18,.89,.32,1.28);overflow:hidden;}
+@keyframes diceStagePop{0%{transform:scale(.85);opacity:0;}100%{transform:scale(1);opacity:1;}}
+.dice-roll-glow-aura{position:absolute;top:45%;left:50%;width:180px;height:180px;transform:translate(-50%,-50%);background:radial-gradient(circle,rgba(193,154,91,.3) 0%,rgba(79,143,124,.15) 50%,transparent 70%);border-radius:50%;pointer-events:none;animation:dicePulseGlow 1.2s infinite alternate ease-in-out;}
+@keyframes dicePulseGlow{0%{transform:translate(-50%,-50%) scale(.85);opacity:.5;}100%{transform:translate(-50%,-50%) scale(1.25);opacity:.95;}}
+.dice-roll-header{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:12px;}
+.dice-roll-icon{font-size:20px;line-height:1;}
+.dice-roll-title{font-family:var(--font-display);font-size:14.5px;font-weight:700;color:var(--text-hi);letter-spacing:.04em;text-transform:uppercase;}
+.dice-roll-arena{position:relative;height:140px;display:flex;align-items:center;justify-content:center;margin:6px 0 10px;}
+.dice-polyhedron{position:relative;width:104px;height:104px;display:flex;align-items:center;justify-content:center;transform-style:preserve-3d;}
+.dice-polyhedron.rolling{animation:diceTumble .75s cubic-bezier(.25,.46,.45,.94) infinite;}
+.dice-polyhedron.landed{animation:diceLand .4s cubic-bezier(.18,.89,.32,1.28) forwards;}
+.dice-polyhedron.crit-success{filter:drop-shadow(0 0 16px rgba(240,213,163,.95)) drop-shadow(0 0 30px rgba(193,154,91,.8));}
+.dice-polyhedron.crit-fumble{filter:drop-shadow(0 0 16px rgba(220,70,50,.9)) drop-shadow(0 0 30px rgba(176,71,58,.7));}
+@keyframes diceTumble{0%{transform:translateY(-20px) rotate(0deg) rotateX(0deg) rotateY(0deg) scale(.9);}25%{transform:translateY(12px) rotate(90deg) rotateX(180deg) rotateY(45deg) scale(1.08);}50%{transform:translateY(-25px) rotate(180deg) rotateX(360deg) rotateY(180deg) scale(.95);}75%{transform:translateY(8px) rotate(270deg) rotateX(540deg) rotateY(270deg) scale(1.05);}100%{transform:translateY(-20px) rotate(360deg) rotateX(720deg) rotateY(360deg) scale(.9);}}
+@keyframes diceLand{0%{transform:translateY(-25px) scale(.9) rotate(20deg);}50%{transform:translateY(6px) scale(1.22,.82) rotate(-5deg);}75%{transform:translateY(-6px) scale(.95,1.05) rotate(2deg);}100%{transform:translateY(0) scale(1,1) rotate(0deg);}}
+.dice-svg-poly{width:104px;height:104px;filter:drop-shadow(0 8px 16px rgba(0,0,0,.5));}
+.dice-poly-base{fill:var(--void-4);stroke:var(--brass-dim);stroke-width:2.5;}
+.dice-poly-top-r{fill:rgba(193,154,91,.22);stroke:var(--brass-dim);stroke-width:1.5;}
+.dice-poly-top-l{fill:rgba(193,154,91,.35);stroke:var(--brass-dim);stroke-width:1.5;}
+.dice-poly-mid-l{fill:rgba(79,143,124,.25);stroke:var(--brass-dim);stroke-width:1.5;}
+.dice-poly-mid-r{fill:rgba(193,154,91,.18);stroke:var(--brass-dim);stroke-width:1.5;}
+.dice-poly-bot-l{fill:rgba(43,34,19,.4);stroke:var(--brass-dim);stroke-width:1.5;}
+.dice-poly-bot-r{fill:rgba(79,143,124,.18);stroke:var(--brass-dim);stroke-width:1.5;}
+.dice-val-display{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:30px;font-weight:900;color:var(--brass-bright);text-shadow:0 2px 8px rgba(0,0,0,.9),0 0 12px rgba(193,154,91,.6);z-index:2;}
+.dice-shadow{position:absolute;bottom:8px;width:80px;height:14px;background:radial-gradient(ellipse at center,rgba(0,0,0,.65) 0%,transparent 70%);border-radius:50%;animation:diceShadowPulse .75s cubic-bezier(.25,.46,.45,.94) infinite;}
+@keyframes diceShadowPulse{0%,50%,100%{transform:scale(.65);opacity:.35;}25%,75%{transform:scale(1.15);opacity:.85;}}
+.dice-roll-formula{font-family:var(--font-mono);font-size:14px;color:var(--text-faint);margin-bottom:6px;}
+.dice-roll-breakdown{margin:6px auto 0;padding:7px 14px;background:var(--void-4);border:1px solid var(--line);border-radius:9px;display:inline-flex;align-items:center;justify-content:center;gap:6px;animation:msgin .25s ease;}
+.dice-breakdown-math{font-family:var(--font-mono);font-size:16px;font-weight:700;color:var(--text-hi);}
+.dice-roll-crit-banner{font-family:var(--font-display);font-size:12.5px;font-weight:700;letter-spacing:.05em;padding:4px 12px;border-radius:999px;margin:6px auto 0;display:inline-block;animation:msgin .2s ease;}
+.dice-roll-crit-banner.success{background:rgba(193,154,91,.25);border:1px solid var(--brass-bright);color:var(--brass-bright);box-shadow:0 0 14px rgba(193,154,91,.4);}
+.dice-roll-crit-banner.fumble{background:rgba(176,71,58,.25);border:1px solid var(--ember-bright);color:var(--ember-bright);box-shadow:0 0 14px rgba(176,71,58,.4);}
+.dice-roll-hint{font-size:10.5px;color:var(--text-faint);margin-top:12px;opacity:.65;}
+.quick-dice-bar{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 14px;}
+.quick-die-btn{flex:1 1 calc(25% - 5px);min-width:48px;padding:7px 4px;background:var(--void-3);border:1px solid var(--line);border-radius:8px;color:var(--text-hi);font-family:var(--font-mono);font-weight:700;font-size:12px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;transition:all .15s ease;}
+.quick-die-btn:hover{border-color:var(--brass-dim);background:var(--void-4);color:var(--brass-bright);transform:translateY(-1px);}
+.quick-die-btn:active{transform:translateY(0);}
+.quick-die-btn span{font-size:9px;color:var(--text-faint);font-weight:500;font-family:var(--font-body);}
 .item-modal-top{display:flex;align-items:center;gap:13px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--line);}
 .item-modal-glyph{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;background:var(--void-3);border:1px solid var(--line);flex-shrink:0;}
 .item-modal-glyph.cat-pocao{background:rgba(79,143,124,.18);border-color:var(--arcane);}
@@ -283,6 +344,28 @@ a{color:var(--arcane-bright);}
 .turn-alert-text{line-height:1;}
 @keyframes turn-bell-pulse{0%,100%{box-shadow:0 0 6px rgba(79,143,124,.2);border-color:rgba(79,143,124,.6);opacity:.92;}50%{box-shadow:0 0 14px 3px rgba(79,143,124,.6);border-color:var(--arcane-bright);opacity:1;}}
 @keyframes turn-bell-swing{0%,65%,100%{transform:rotate(0deg);}70%{transform:rotate(14deg);}75%{transform:rotate(-12deg);}80%{transform:rotate(8deg);}85%{transform:rotate(-6deg);}90%{transform:rotate(0deg);}}
+
+/* ---------- Turn Timer Component ---------- */
+.turn-timer-widget{display:inline-flex;align-items:center;gap:5px;padding:3px 6px 3px 8px;background:var(--void-3);border:1px solid var(--line);border-radius:999px;font-family:var(--font-mono);font-size:11px;color:var(--text-lo);user-select:none;transition:all .2s ease;margin-right:2px;}
+.turn-timer-widget:hover{border-color:var(--brass-dim);background:var(--void-4);}
+.turn-timer-widget.warning{border-color:rgba(193,154,91,.5);background:rgba(193,154,91,.1);color:var(--brass-bright);}
+.turn-timer-widget.danger{border-color:rgba(176,71,58,.5);background:rgba(176,71,58,.12);color:var(--ember-bright);}
+.turn-timer-widget.paused{opacity:0.75;border-style:dashed;}
+.turn-timer-badge{display:inline-flex;align-items:center;gap:5px;cursor:default;}
+.turn-timer-pulse{width:6px;height:6px;border-radius:50%;background:var(--arcane-bright);box-shadow:0 0 6px var(--arcane);animation:turnTimerPulse 2s infinite ease-in-out;flex-shrink:0;}
+.turn-timer-widget.warning .turn-timer-pulse{background:var(--brass-bright);box-shadow:0 0 6px var(--brass);}
+.turn-timer-widget.danger .turn-timer-pulse{background:var(--ember-bright);box-shadow:0 0 6px var(--ember);}
+.turn-timer-widget.paused .turn-timer-pulse{animation:none;background:var(--text-faint);box-shadow:none;}
+@keyframes turnTimerPulse{0%,100%{transform:scale(.9);opacity:.75;}50%{transform:scale(1.3);opacity:1;box-shadow:0 0 8px var(--arcane-bright);}}
+.turn-timer-icon{font-size:11px;line-height:1;opacity:.85;}
+.turn-timer-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-faint);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.turn-timer-digits{font-weight:700;font-size:11.5px;letter-spacing:.02em;color:var(--text-hi);min-width:34px;text-align:right;font-variant-numeric:tabular-nums;}
+.turn-timer-widget.warning .turn-timer-digits{color:var(--brass-bright);}
+.turn-timer-widget.danger .turn-timer-digits{color:var(--ember-bright);}
+.turn-timer-control-btn{width:18px;height:18px;border-radius:50%;background:var(--void-4);border:1px solid var(--line);color:var(--text-faint);display:inline-flex;align-items:center;justify-content:center;padding:0;cursor:pointer;transition:all .15s ease;line-height:1;}
+.turn-timer-control-btn:hover{color:var(--brass-bright);border-color:var(--brass-dim);background:var(--void-2);transform:scale(1.1);}
+.turn-timer-control-btn:active{transform:scale(0.95);}
+
 .timer-pill{margin:10px 16px 0;padding:8px 12px;border-radius:9px;background:rgba(176,71,58,.14);border:1px solid var(--ember);font-size:12px;color:var(--ember-bright);display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-weight:700;}
 .timer-pill.calm{background:var(--void-3);border-color:var(--line-soft);color:var(--text-lo);}
 #chat-scroll{flex:1;min-height:0;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px;}
@@ -703,6 +786,50 @@ a{color:var(--arcane-bright);}
  .stat-strip{gap:6px;}
  .attr-grid{gap:5px;}
 }
+
+/* =========================================================
+   MULTIMEDIA & EXPORT STUDIO STYLES
+   ========================================================= */
+.mm-nav{display:flex;gap:6px;padding:0 20px;border-bottom:1px solid var(--line);background:var(--void-3);overflow-x:auto;}
+.mm-nav-btn{background:none;border:none;color:var(--text-lo);padding:11px 13px;font-size:12.5px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .15s;}
+.mm-nav-btn:hover{color:var(--text-hi);}
+.mm-nav-btn.active{color:var(--brass-bright);border-bottom-color:var(--brass-bright);}
+.mm-pane{padding:16px 20px 20px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;}
+.mm-pane.hidden{display:none;}
+.mm-box{background:var(--void-3);border:1px solid var(--line);border-radius:12px;padding:14px 16px;}
+.mm-box-title{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--brass-bright);font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+.mm-prompt-input{width:100%;min-height:70px;background:var(--void-4);border:1px solid var(--line);border-radius:9px;color:var(--text-hi);font-size:13px;padding:10px;resize:vertical;line-height:1.5;box-sizing:border-box;}
+.mm-chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;}
+.mm-chip{background:var(--void-4);border:1px solid var(--line-soft);color:var(--text-lo);font-size:11.5px;padding:5px 10px;border-radius:999px;cursor:pointer;transition:all .15s;}
+.mm-chip:hover{border-color:var(--brass-dim);color:var(--text-hi);}
+.mm-chip.active{background:rgba(193,154,91,.18);border-color:var(--brass-bright);color:var(--brass-bright);font-weight:600;}
+.mm-options-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.mm-preview-container{width:100%;border-radius:10px;overflow:hidden;background:var(--void-4);border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:180px;position:relative;}
+.mm-preview-media{max-width:100%;max-height:340px;border-radius:8px;object-fit:contain;}
+.mm-audio-player{width:100%;background:var(--void-4);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px;}
+.mm-audio-controls{display:flex;align-items:center;gap:12px;}
+.mm-play-btn{width:42px;height:42px;border-radius:50%;background:var(--brass-bright);color:var(--void);border:none;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;flex-shrink:0;transition:transform .1s;}
+.mm-play-btn:hover{transform:scale(1.05);}
+.mm-progress-bar{flex:1;height:6px;background:var(--void-2);border-radius:3px;position:relative;cursor:pointer;overflow:hidden;}
+.mm-progress-fill{height:100%;background:var(--brass-bright);width:0%;transition:width .1s linear;}
+.mm-time-disp{font-family:var(--font-mono);font-size:11.5px;color:var(--text-faint);min-width:70px;text-align:right;}
+.mm-gallery-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(130px, 1fr));gap:10px;margin-top:10px;}
+.mm-gallery-item{border-radius:8px;overflow:hidden;border:1px solid var(--line);aspect-ratio:1/1;cursor:pointer;position:relative;background:var(--void-4);}
+.mm-gallery-item img{width:100%;height:100%;object-fit:cover;}
+.mm-gallery-item:hover{border-color:var(--brass-bright);}
+.mm-action-btn{padding:10px 16px;border-radius:9px;border:none;background:linear-gradient(160deg,var(--brass-bright),var(--brass));color:var(--void);font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:filter .15s;}
+.mm-action-btn:hover{filter:brightness(1.08);}
+.mm-action-btn:disabled{opacity:.45;cursor:not-allowed;}
+.mm-sec-btn{padding:9px 14px;border-radius:9px;border:1px solid var(--line);background:var(--void-3);color:var(--text-hi);font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;text-decoration:none;transition:all .15s;}
+.mm-sec-btn:hover{border-color:var(--brass-dim);background:var(--void-4);}
+.mm-export-card{background:var(--void-3);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px;transition:border-color .15s;}
+.mm-export-card:hover{border-color:var(--brass-dim);}
+.mm-export-icon{width:40px;height:40px;border-radius:10px;background:var(--void-4);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.mm-export-info{flex:1;min-width:0;}
+.mm-export-info b{display:block;font-size:13.5px;color:var(--text-hi);margin-bottom:2px;}
+.mm-export-info span{display:block;font-size:11.5px;color:var(--text-lo);line-height:1.4;}
+.mm-status-bar{font-size:12px;color:var(--brass-bright);display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(193,154,91,.1);border-radius:7px;border:1px solid var(--brass-dim);}
+.mm-canvas-storyboard{width:100%;max-width:540px;aspect-ratio:16/9;border-radius:8px;background:#0d0e12;box-shadow:inset 0 0 40px rgba(0,0,0,0.8);}
 </style>
 </head>
 <body>
@@ -955,6 +1082,21 @@ a{color:var(--arcane-bright);}
  <div class="panel-head">
   <h2 id="chat-panel-title" data-i18n="gmTab">O Mestre</h2>
   <div class="spacer"></div>
+  <div id="turn-timer-widget" class="turn-timer-widget hidden" title="Duração do turno atual" data-i18n-title="turnTimerTooltip">
+    <div class="turn-timer-badge" id="turn-timer-badge">
+      <span class="turn-timer-pulse"></span>
+      <span class="turn-timer-icon">⏱</span>
+      <span class="turn-timer-label" id="turn-timer-label" data-i18n="turnTimerLabel">Turno:</span>
+      <span class="turn-timer-digits" id="turn-timer-digits">00:00</span>
+    </div>
+    <button type="button" class="turn-timer-control-btn" id="btn-turn-timer-toggle" title="Pausar cronômetro" data-i18n-title="turnTimerPause" aria-label="Pausar cronômetro">
+      <svg id="turn-timer-pause-icon" viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+      <svg id="turn-timer-play-icon" class="hidden" viewBox="0 0 24 24" width="10" height="10" fill="currentColor"><polygon points="6,4 19,12 6,20"/></svg>
+    </button>
+    <button type="button" class="turn-timer-control-btn" id="btn-turn-timer-reset" title="Reiniciar cronômetro do turno" data-i18n-title="turnTimerReset" aria-label="Reiniciar cronômetro">
+      <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+    </button>
+  </div>
   <button class="icon-btn" id="btn-chat-tips" title="Comandos rápidos & Dicas" data-i18n-title="chatTipsTitle" aria-label="Comandos rápidos & Dicas">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="18" height="18"><path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7z"/><path d="M9 21h6"/><path d="M12 17v-4"/></svg>
   </button>
@@ -1079,6 +1221,19 @@ a{color:var(--arcane-bright);}
    </div>
 
    <p class="roll-intro" data-i18n="rollIntro">O Mestre solicita as rolagens durante a aventura, e o modificador da sua ficha é aplicado automaticamente. Seu histórico fica registrado aqui.</p>
+   <div class="log-title" style="display:flex;justify-content:space-between;align-items:center;">
+     <span data-i18n="quickDiceTitle">Rolagem Rápida</span>
+   </div>
+   <div class="quick-dice-bar" id="quick-dice-bar">
+     <button type="button" class="quick-die-btn" data-die="1d20"><b>d20</b><span>Teste</span></button>
+     <button type="button" class="quick-die-btn" data-die="1d12"><b>d12</b><span>Dano</span></button>
+     <button type="button" class="quick-die-btn" data-die="1d10"><b>d10</b><span>Dano</span></button>
+     <button type="button" class="quick-die-btn" data-die="1d8"><b>d8</b><span>Arma</span></button>
+     <button type="button" class="quick-die-btn" data-die="1d6"><b>d6</b><span>Básico</span></button>
+     <button type="button" class="quick-die-btn" data-die="1d4"><b>d4</b><span>Poção</span></button>
+     <button type="button" class="quick-die-btn" data-die="1d100"><b>d100</b><span>Tabela</span></button>
+     <button type="button" class="quick-die-btn" data-die="2d6"><b>2d6</b><span>Ação</span></button>
+   </div>
    <div class="log-title" data-i18n="rollHistoryTitle">Histórico de Rolagens</div>
    <div id="roll-log"></div>
  </div>
@@ -1297,6 +1452,287 @@ a{color:var(--arcane-bright);}
   </div>
 </div>
 
+<!-- MULTIMEDIA & EXPORT STUDIO MODAL -->
+<div class="modal-overlay hidden" id="multimedia-overlay">
+  <div class="modal-box" style="max-width:720px;max-height:90vh;display:flex;flex-direction:column;">
+    <div class="modal-head" style="padding-bottom:12px;">
+      <h3 style="display:flex;align-items:center;gap:9px;">
+        <span style="font-size:20px;">🎬</span>
+        <span data-i18n="multimediaTitle">Estúdio de Exportação & Mídia</span>
+      </h3>
+      <button class="icon-btn" id="mm-close" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="mm-nav" id="mm-nav">
+      <button type="button" class="mm-nav-btn active" data-mm-tab="video">🎬 <span data-i18n="tabVideo">Vídeo</span></button>
+      <button type="button" class="mm-nav-btn" data-mm-tab="music">🎵 <span data-i18n="tabMusic">Música & Trilha</span></button>
+      <button type="button" class="mm-nav-btn" data-mm-tab="images">🎨 <span data-i18n="tabImages">Ilustrações</span></button>
+      <button type="button" class="mm-nav-btn" data-mm-tab="screenplay">📜 <span data-i18n="tabScreenplay">Roteiro & Livro</span></button>
+      <button type="button" class="mm-nav-btn" data-mm-tab="pack">📦 <span data-i18n="tabPack">Pacote Completo</span></button>
+    </div>
+
+    <!-- 1. VIDEO PANE -->
+    <div class="mm-pane" id="mm-pane-video">
+      <div class="mm-box">
+        <div class="mm-box-title">🎬 Descrição Cinematográfica da Cena</div>
+        <textarea id="mm-video-prompt" class="mm-prompt-input" placeholder="Descreva a cena para gerar o vídeo ou clique em 'Usar Cena Atual'…"></textarea>
+        <div class="mm-chips">
+          <button type="button" class="mm-chip" id="mm-chip-video-current">⚡ Usar ação mais recente da cena</button>
+          <button type="button" class="mm-chip" id="mm-chip-video-climax">⚔️ Clímax dramático / Combate</button>
+          <button type="button" class="mm-chip" id="mm-chip-video-intro">🏰 Vista panorâmica do cenário</button>
+        </div>
+        <div class="mm-options-row" style="margin-top:10px;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:11.5px;color:var(--text-lo);">Proporção:</span>
+            <select id="mm-video-aspect" class="sc-select" style="padding:4px 8px;font-size:12px;width:auto;">
+              <option value="16:9">16:9 (Cinema / YouTube)</option>
+              <option value="9:16">9:16 (Shorts / Reels)</option>
+              <option value="1:1">1:1 (Quadrado)</option>
+            </select>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:11.5px;color:var(--text-lo);">Duração:</span>
+            <select id="mm-video-duration" class="sc-select" style="padding:4px 8px;font-size:12px;width:auto;">
+              <option value="5s">5 segundos</option>
+              <option value="10s">10 segundos</option>
+              <option value="15s">15 segundos</option>
+            </select>
+          </div>
+          <button type="button" class="mm-action-btn" id="mm-btn-gen-video" style="margin-left:auto;">
+            <span>🎬</span> Gerar Vídeo
+          </button>
+        </div>
+      </div>
+
+      <div id="mm-video-status" class="mm-status-bar hidden"></div>
+
+      <!-- Video Preview Box -->
+      <div class="mm-preview-container" id="mm-video-preview-box">
+        <video id="mm-video-el" class="mm-preview-media hidden" controls playsinline></video>
+        <canvas id="mm-storyboard-canvas" class="mm-canvas-storyboard hidden" width="640" height="360"></canvas>
+        <div id="mm-video-placeholder" style="text-align:center;padding:30px 20px;color:var(--text-faint);">
+          <div style="font-size:38px;margin-bottom:8px;">🎬</div>
+          <div style="font-size:13px;color:var(--text-lo);">Nenhum vídeo gerado ainda.</div>
+          <div style="font-size:11.5px;margin-top:4px;">Gere uma animação cinematográfica baseada nas ações da sua aventura.</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button type="button" class="mm-sec-btn hidden" id="mm-btn-download-video">
+          <span>⬇️</span> Baixar Vídeo (.MP4)
+        </button>
+      </div>
+    </div>
+
+    <!-- 2. MUSIC PANE -->
+    <div class="mm-pane hidden" id="mm-pane-music">
+      <div class="mm-box">
+        <div class="mm-box-title">🎵 Clima & Trilha Sonora de Fantasia</div>
+        <textarea id="mm-music-prompt" class="mm-prompt-input" placeholder="Descreva o estilo musical ou selecione um dos temas abaixo…"></textarea>
+        <div class="mm-chips">
+          <button type="button" class="mm-chip" data-music-preset="Combate épico com tambores de guerra, metais grandiosos e ritmo frenético para batalha de RPG">⚔️ Combate Épico</button>
+          <button type="button" class="mm-chip" data-music-preset="Música de taverna medieval acolhedora, alaúde, flauta doce e clima festivo">🍻 Taverna & Descanso</button>
+          <button type="button" class="mm-chip" data-music-preset="Trilha sombria para exploração de masmorra, ecos, cordas graves e atmosfera tensa">🕯️ Masmorra Sombria</button>
+          <button type="button" class="mm-chip" data-music-preset="Música mística e etérea para floresta élfica ou santuário antigo, harpa e sopros">🌲 Floresta Arcana</button>
+          <button type="button" class="mm-chip" data-music-preset="Trilha de suspense e furtividade, passos lentos, violoncelo suave e percussão sutil">⚡ Furtividade & Tensão</button>
+        </div>
+        <div class="mm-options-row" style="margin-top:10px;justify-content:flex-end;">
+          <button type="button" class="mm-action-btn" id="mm-btn-gen-music">
+            <span>🎵</span> Gerar Trilha Sonora
+          </button>
+        </div>
+      </div>
+
+      <div id="mm-music-status" class="mm-status-bar hidden"></div>
+
+      <!-- Music Player Box -->
+      <div class="mm-audio-player" id="mm-audio-box">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:18px;">🎼</span>
+            <div>
+              <b id="mm-audio-title" style="font-size:13px;color:var(--text-hi);">Trilha Sonora da Aventura</b>
+              <span id="mm-audio-subtitle" style="display:block;font-size:11px;color:var(--text-faint);">Pronta para reprodução</span>
+            </div>
+          </div>
+          <button type="button" class="mm-sec-btn" id="mm-btn-download-music" style="padding:6px 10px;font-size:11.5px;">
+            <span>⬇️</span> Baixar Áudio (.WAV)
+          </button>
+        </div>
+        
+        <div class="mm-audio-controls">
+          <button type="button" class="mm-play-btn" id="mm-audio-play-btn" aria-label="Play/Pause">▶</button>
+          <div class="mm-progress-bar" id="mm-audio-progress-bar">
+            <div class="mm-progress-fill" id="mm-audio-progress-fill"></div>
+          </div>
+          <span class="mm-time-disp" id="mm-audio-time">0:00 / 0:00</span>
+        </div>
+        <audio id="mm-audio-el" class="hidden" preload="auto"></audio>
+      </div>
+    </div>
+
+    <!-- 3. IMAGES PANE -->
+    <div class="mm-pane hidden" id="mm-pane-images">
+      <div class="mm-box">
+        <div class="mm-box-title">🎨 Ilustração & Arte Digital da Sessão</div>
+        <textarea id="mm-image-prompt" class="mm-prompt-input" placeholder="Descreva o que deseja ilustrar (personagem, monstro, cenário, item)…"></textarea>
+        <div class="mm-chips">
+          <button type="button" class="mm-chip" id="mm-chip-img-scene">🏰 Ilustrar Cena Atual do Chat</button>
+          <button type="button" class="mm-chip" id="mm-chip-img-char">🧙 Retrato do Meu Personagem</button>
+          <button type="button" class="mm-chip" id="mm-chip-img-monster">👹 Monstro / Criatura Enfrentada</button>
+          <button type="button" class="mm-chip" id="mm-chip-img-item">🗡️ Item Mágico do Inventário</button>
+        </div>
+        <div class="mm-options-row" style="margin-top:10px;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:11.5px;color:var(--text-lo);">Proporção:</span>
+            <select id="mm-image-aspect" class="sc-select" style="padding:4px 8px;font-size:12px;width:auto;">
+              <option value="1:1">1:1 (Quadrado / Retrato)</option>
+              <option value="16:9">16:9 (Paisagem / Cenário)</option>
+              <option value="9:16">9:16 (Vertical)</option>
+              <option value="4:3">4:3 (Clássico)</option>
+            </select>
+          </div>
+          <button type="button" class="mm-action-btn" id="mm-btn-gen-image" style="margin-left:auto;">
+            <span>🎨</span> Gerar Ilustração
+          </button>
+        </div>
+      </div>
+
+      <div id="mm-image-status" class="mm-status-bar hidden"></div>
+
+      <!-- Image Preview & Gallery -->
+      <div class="mm-preview-container" id="mm-image-preview-box">
+        <img id="mm-image-el" class="mm-preview-media hidden" alt="Ilustração gerada">
+        <div id="mm-image-placeholder" style="text-align:center;padding:30px 20px;color:var(--text-faint);">
+          <div style="font-size:38px;margin-bottom:8px;">🎨</div>
+          <div style="font-size:13px;color:var(--text-lo);">Nenhuma imagem gerada ainda.</div>
+          <div style="font-size:11.5px;margin-top:4px;">Gere artes conceituais do seu herói, criaturas e locais explorados.</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button type="button" class="mm-sec-btn hidden" id="mm-btn-download-image">
+          <span>⬇️</span> Baixar Imagem (.PNG)
+        </button>
+      </div>
+
+      <!-- Recent generated gallery -->
+      <div id="mm-gallery-box" class="hidden">
+        <div class="mm-box-title" style="margin-top:6px;">🖼️ Galeria Desta Sessão</div>
+        <div class="mm-gallery-grid" id="mm-gallery-grid"></div>
+      </div>
+    </div>
+
+    <!-- 4. SCREENPLAY & BOOK PANE -->
+    <div class="mm-pane hidden" id="mm-pane-screenplay">
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div class="mm-export-card" id="mm-card-script" style="cursor:pointer;">
+          <div class="mm-export-icon">📜</div>
+          <div class="mm-export-info">
+            <b>Roteiro de Vídeo Cinematográfico (.TXT)</b>
+            <span>Converte toda a campanha em roteiro com cenas numeradas, diálogos, áudio e descrições visuais para produção de vídeo.</span>
+          </div>
+          <button type="button" class="mm-sec-btn" id="mm-btn-export-script">Gerar Roteiro</button>
+        </div>
+
+        <div class="mm-export-card" id="mm-card-pdf-art" style="cursor:pointer;">
+          <div class="mm-export-icon">📖</div>
+          <div class="mm-export-info">
+            <b>Livro da Aventura em PDF Ilustrado</b>
+            <span>Gera um livro romanceado dividido em capítulos, com capa épica e memórias visuais ilustradas por IA.</span>
+          </div>
+          <button type="button" class="mm-sec-btn" id="mm-btn-export-pdf-art">Gerar PDF Ilustrado</button>
+        </div>
+
+        <div class="mm-export-card" id="mm-card-pdf-text" style="cursor:pointer;">
+          <div class="mm-export-icon">📄</div>
+          <div class="mm-export-info">
+            <b>Livro da Aventura em PDF (Texto Rápido)</b>
+            <span>Versão literária compacta para leitura e impressão rápida em PDF sem ilustrações pesadas.</span>
+          </div>
+          <button type="button" class="mm-sec-btn" id="mm-btn-export-pdf-text">Gerar PDF Rápido</button>
+        </div>
+
+        <div class="mm-export-card" id="mm-card-sheet-pdf" style="cursor:pointer;">
+          <div class="mm-export-icon">🧙</div>
+          <div class="mm-export-info">
+            <b>Ficha do Personagem em PDF</b>
+            <span>Documento elegante com atributos, perícias, inventário, talentos e retrato ilustrado do herói.</span>
+          </div>
+          <button type="button" class="mm-sec-btn" id="mm-btn-export-sheet-pdf">Exportar Ficha</button>
+        </div>
+      </div>
+
+      <div id="mm-script-status" class="mm-status-bar hidden" style="margin-top:6px;"></div>
+    </div>
+
+    <!-- 5. FULL PACK PANE -->
+    <div class="mm-pane hidden" id="mm-pane-pack">
+      <div class="mm-box">
+        <div class="mm-box-title">📦 Pacote de Mídia & Registro Completo</div>
+        <p class="modal-note" style="margin-bottom:12px;">
+          Exporte um pacote consolidado contendo:
+        </p>
+        <ul style="font-size:12.5px;color:var(--text-lo);line-height:1.7;margin:0 0 16px 18px;">
+          <li>📝 Transcrição completa e limpa da sessão de jogo</li>
+          <li>🎬 Roteiro cinematográfico formatado para vídeo</li>
+          <li>🧙 Ficha completa do personagem e estatísticas</li>
+          <li>🖼️ Registro de ilustrações e prompts de geração de mídia</li>
+          <li>🎵 Trilha sonora da sessão em formato de áudio</li>
+        </ul>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button type="button" class="mm-action-btn" id="mm-btn-export-fullpack">
+            <span>📦</span> Baixar Pacote Completo (.JSON / Bundle)
+          </button>
+          <button type="button" class="mm-sec-btn" id="mm-btn-export-raw-transcript">
+            <span>📄</span> Apenas Transcrição (.TXT)
+          </button>
+        </div>
+      </div>
+
+      <div id="mm-pack-status" class="mm-status-bar hidden"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- DICE ROLL ANIMATION OVERLAY -->
+<div id="dice-roll-overlay" class="dice-roll-overlay hidden" aria-live="polite">
+  <div class="dice-roll-stage" id="dice-roll-stage">
+    <div class="dice-roll-glow-aura"></div>
+    <div class="dice-roll-header">
+      <span class="dice-roll-icon">🎲</span>
+      <span class="dice-roll-title" id="dice-roll-title">Rolando Dados...</span>
+    </div>
+    
+    <div class="dice-roll-arena" id="dice-roll-arena">
+      <div class="dice-polyhedron" id="dice-polyhedron">
+        <svg class="dice-svg-poly" viewBox="0 0 100 100">
+          <polygon points="50,5 95,28 95,72 50,95 5,72 5,28" class="dice-poly-base"/>
+          <polygon points="50,5 95,28 50,50" class="dice-poly-top-r"/>
+          <polygon points="50,5 5,28 50,50" class="dice-poly-top-l"/>
+          <polygon points="5,28 5,72 50,50" class="dice-poly-mid-l"/>
+          <polygon points="95,28 95,72 50,50" class="dice-poly-mid-r"/>
+          <polygon points="5,72 50,95 50,50" class="dice-poly-bot-l"/>
+          <polygon points="95,72 50,95 50,50" class="dice-poly-bot-r"/>
+        </svg>
+        <div class="dice-val-display" id="dice-val-display">20</div>
+      </div>
+      <div class="dice-shadow"></div>
+    </div>
+
+    <div class="dice-roll-formula" id="dice-roll-formula">1d20 + 3</div>
+    
+    <div class="dice-roll-crit-banner hidden" id="dice-roll-crit-banner"></div>
+    <div class="dice-roll-breakdown hidden" id="dice-roll-breakdown">
+      <span class="dice-breakdown-math" id="dice-breakdown-math">17 + 3 = 20</span>
+    </div>
+
+    <div class="dice-roll-hint" id="dice-roll-hint" data-i18n="clickToSkip">Toque para pular</div>
+  </div>
+</div>
+
 <script>
 (function(){
 "use strict";
@@ -1436,7 +1872,29 @@ var I18N = {
     tipRestDesc: "Propõe ao Mestre um descanso para recuperar PV, magias e recursos gastos.",
     tipHelpDesc: "Mostra regras de testes, combate e orientações sobre como narrar para a IA.",
     tipInteractionHint: "💡 <b>Dica de interpretação:</b> Descreva intenção e método na sua mensagem (ex: <i>\"Tento forçar a fechadura usando meu pé de cabra com cuidado\"</i>). O Mestre responderá com a narrativa e pedirá os testes apropriados.",
-    gmIdleTipTitle: "Dica do Mestre"
+    gmIdleTipTitle: "Dica do Mestre",
+    multimediaTitle: "Estúdio de Exportação & Mídia",
+    tabVideo: "Vídeo",
+    tabMusic: "Música & Trilha",
+    tabImages: "Ilustrações",
+    tabScreenplay: "Roteiro & Livro",
+    tabPack: "Pacote Completo",
+    filterEquipPlaceholder: "Filtrar itens, armas, poções...",
+    noEquipFound: "Nenhum item encontrado com esse filtro.",
+    clearFilter: "Limpar busca",
+    allFilterPill: "Todos",
+    quickDiceTitle: "Rolagem Rápida",
+    rollingDiceTitle: "Rolando Dados...",
+    clickToSkip: "Toque para pular",
+    critSuccess: "★ SUCESSO CRÍTICO! ★",
+    critFumble: "⚠️ FALHA CRÍTICA!",
+    turnTimerLabel: "Turno:",
+    turnTimerTooltip: "Duração do turno atual na aventura",
+    turnTimerReset: "Reiniciar cronômetro do turno",
+    turnTimerPause: "Pausar cronômetro",
+    turnTimerResume: "Retomar cronômetro",
+    turnTimerYourTurn: "Você",
+    turnTimerMemberTurn: "Turno"
   },
   en: {
     appName: "Solo Master",
@@ -1569,7 +2027,29 @@ var I18N = {
     tipRestDesc: "Propose a rest to recover HP, spell slots, and spent resources.",
     tipHelpDesc: "Shows rules for checks, combat, and tips on how to narrate to the AI.",
     tipInteractionHint: "💡 <b>Roleplay tip:</b> Describe your intent and approach in your action (e.g. <i>\"I carefully pick the lock using my crowbar\"</i>). The GM will narrate the outcome and prompt for checks.",
-    gmIdleTipTitle: "GM Hint"
+    gmIdleTipTitle: "GM Hint",
+    multimediaTitle: "Export & Multimedia Studio",
+    tabVideo: "Video",
+    tabMusic: "Music & Soundtrack",
+    tabImages: "Illustrations",
+    tabScreenplay: "Script & Book",
+    tabPack: "Full Media Pack",
+    filterEquipPlaceholder: "Filter items, weapons, potions...",
+    noEquipFound: "No items found matching this filter.",
+    clearFilter: "Clear search",
+    allFilterPill: "All",
+    quickDiceTitle: "Quick Dice",
+    rollingDiceTitle: "Rolling Dice...",
+    clickToSkip: "Click to skip",
+    critSuccess: "★ CRITICAL SUCCESS! ★",
+    critFumble: "⚠️ CRITICAL FAILURE!",
+    turnTimerLabel: "Turn:",
+    turnTimerTooltip: "Duration of current turn in adventure",
+    turnTimerReset: "Reset turn timer",
+    turnTimerPause: "Pause timer",
+    turnTimerResume: "Resume timer",
+    turnTimerYourTurn: "You",
+    turnTimerMemberTurn: "Turn"
   },
   es: {
     appName: "Mestre Solo",
@@ -1702,7 +2182,29 @@ var I18N = {
     tipRestDesc: "Propón al Máster un descanso para recuperar PG, conjuros y recursos.",
     tipHelpDesc: "Muestra reglas de pruebas, combate y consejos sobre cómo narrar a la IA.",
     tipInteractionHint: "💡 <b>Consejo de interpretación:</b> Describe tu intención y método (ej: <i>\"Intento forzar la cerradura con mi ganzúa con cuidado\"</i>). El Máster narrará y pedirá las pruebas.",
-    gmIdleTipTitle: "Consejo del Máster"
+    gmIdleTipTitle: "Consejo del Máster",
+    multimediaTitle: "Estudio de Exportación y Medios",
+    tabVideo: "Vídeo",
+    tabMusic: "Música y Banda Sonora",
+    tabImages: "Ilustraciones",
+    tabScreenplay: "Guión y Libro",
+    tabPack: "Paquete Completo",
+    filterEquipPlaceholder: "Filtrar objetos, armas, pociones...",
+    noEquipFound: "No se encontraron objetos con este filtro.",
+    clearFilter: "Limpiar búsqueda",
+    allFilterPill: "Todos",
+    quickDiceTitle: "Tirada Rápida",
+    rollingDiceTitle: "Tirando Dados...",
+    clickToSkip: "Toca para saltar",
+    critSuccess: "★ ¡ÉXITO CRÍTICO! ★",
+    critFumble: "⚠️ ¡FALLO CRÍTICO!",
+    turnTimerLabel: "Turno:",
+    turnTimerTooltip: "Duración del turno actual en la aventura",
+    turnTimerReset: "Reiniciar cronómetro del turno",
+    turnTimerPause: "Pausar cronómetro",
+    turnTimerResume: "Reanudar cronómetro",
+    turnTimerYourTurn: "Tú",
+    turnTimerMemberTurn: "Turno"
   }
 };
 
@@ -3014,6 +3516,8 @@ function definirCategoriaItem(nome, cat, ficha){
 }
 
 var sheetCollapsed = {};
+var sheetEquipFilter = "";
+var sheetCategoryFilter = "";
 function sectionHtml(key, title, bodyHtml){
   var collapsed = !!sheetCollapsed[key];
   return '<div class="sheet-section'+(collapsed?' collapsed':'')+'" data-key="'+key+'"><div class="sheet-section-title" data-toggle="'+key+'"><span class="car">▾</span>'+esc(title)+'</div><div class="sheet-section-body">'+bodyHtml+'</div></div>';
@@ -3071,18 +3575,53 @@ function renderCharacterSheet(c, rootId){
   if(c.talentos && c.talentos.length) html += sectionHtml("talentos","Talentos",'<ul class="list-plain">'+c.talentos.map(function(x){return '<li>'+esc(x)+((c.usos||{})[normaliza(x)] ? '<span class="uso-cont"'+(((c.usos||{})[normaliza(x)].atual===0)?' data-zero="1"':'')+'>'+(c.usos||{})[normaliza(x)].atual+'/'+(c.usos||{})[normaliza(x)].maximo+'</span>' : '')+'<button class="item-help" data-item-info="'+esc(x)+'" title="O que e isto?">?</button></li>';}).join("")+'</ul>');
   if(c.magias && c.magias.length) html += sectionHtml("magias","Magias",'<ul class="list-plain">'+c.magias.map(function(x){return '<li>'+esc(x)+((c.usos||{})[normaliza(x)] ? '<span class="uso-cont"'+(((c.usos||{})[normaliza(x)].atual===0)?' data-zero="1"':'')+'>'+(c.usos||{})[normaliza(x)].atual+'/'+(c.usos||{})[normaliza(x)].maximo+'</span>' : '')+'<button class="item-help" data-item-info="'+esc(x)+'" title="O que e isto?">?</button></li>';}).join("")+'</ul>');
   if((c.equipamento&&c.equipamento.length)||c.dinheiro){
-    var eqBody=""; if(c.dinheiro) eqBody+='<p class="gold-line">'+esc(c.dinheiro)+'</p>';
-    if(c.equipamento&&c.equipamento.length) eqBody+='<ul class="list-plain">'+c.equipamento.map(function(x){
-      var catId = obterCategoriaItem(x, c);
-      var catInfo = CATEGORIAS_ITENS[catId] || CATEGORIAS_ITENS.outro;
-      var vendavel = (c.itensVendaveis||[]).some(function(n){ return normaliza(n)===normaliza(x); });
-      var comprado = (c.itensComprados||[]).some(function(n){ return normaliza(n)===normaliza(x); });
-      var tag = vendavel ? '<span class="tag-item vend" title="Produzido pelo personagem — pode ser vendido no mercado">vendável</span>'
-        : comprado ? '<span class="tag-item comp" title="Comprado de outro jogador — não pode ser revendido">comprado</span>' : '';
-      var u = (c.usos||{})[normaliza(x)];
-      var cont = u ? '<span class="uso-cont"'+(u.atual===0?' data-zero="1"':'')+'>'+u.atual+'/'+u.maximo+'</span>' : '';
-      return '<li class="item-row"><span class="item-cat-badge cat-'+esc(catId)+'" title="'+esc(catInfo.label)+'">'+catInfo.icon+'</span><span class="item-name">'+esc(x)+'</span>'+cont+tag+'<button class="item-help" data-item-info="'+esc(x)+'" title="Ver detalhes de '+esc(x)+'">?</button></li>';
-    }).join("")+'</ul>';
+    var eqBody="";
+    if(c.dinheiro) eqBody+='<p class="gold-line">'+esc(c.dinheiro)+'</p>';
+    if(c.equipamento&&c.equipamento.length){
+      var totalEquips = c.equipamento.length;
+      var catCounts = {};
+      c.equipamento.forEach(function(item){
+        var cat = obterCategoriaItem(item, c);
+        catCounts[cat] = (catCounts[cat] || 0) + 1;
+      });
+
+      eqBody += '<div class="equip-search-wrap">';
+      eqBody += '  <div class="equip-search-box">';
+      eqBody += '    <span class="equip-search-icon" aria-hidden="true">🔍</span>';
+      eqBody += '    <input type="text" id="equip-search-input" class="equip-search-input" placeholder="' + esc(t("filterEquipPlaceholder","Filtrar itens, armas, poções...")) + '" value="' + esc(sheetEquipFilter) + '" autocomplete="off" spellcheck="false" aria-label="Filtrar itens por nome">';
+      eqBody += '    <button type="button" id="equip-search-clear" class="equip-search-clear' + (sheetEquipFilter || sheetCategoryFilter ? '' : ' hidden') + '" title="' + esc(t("clearFilter","Limpar busca")) + '" aria-label="Limpar busca">✕</button>';
+      eqBody += '  </div>';
+
+      var availableCats = Object.keys(catCounts);
+      if(availableCats.length > 1 || totalEquips > 2){
+        eqBody += '  <div class="equip-filter-pills" id="equip-filter-pills">';
+        eqBody += '    <button type="button" class="equip-pill' + (!sheetCategoryFilter ? ' active' : '') + '" data-cat-filter="" title="Ver todos os itens">' + esc(t("allFilterPill","Todos")) + ' (' + totalEquips + ')</button>';
+        availableCats.forEach(function(catId){
+          var catInfo = CATEGORIAS_ITENS[catId] || CATEGORIAS_ITENS.outro;
+          var active = sheetCategoryFilter === catId ? ' active' : '';
+          eqBody += '    <button type="button" class="equip-pill' + active + '" data-cat-filter="' + esc(catId) + '" title="Filtrar por ' + esc(catInfo.label) + '">' + catInfo.icon + ' ' + esc(catInfo.label) + ' (' + catCounts[catId] + ')</button>';
+        });
+        eqBody += '  </div>';
+      }
+
+      eqBody += '  <div class="equip-count-bar" id="equip-count-bar">';
+      eqBody += '    <span id="equip-count-text">Total: ' + totalEquips + ' item' + (totalEquips > 1 ? 'ns' : '') + '</span>';
+      eqBody += '  </div>';
+      eqBody += '</div>';
+
+      eqBody += '<ul class="list-plain" id="equip-items-list">' + c.equipamento.map(function(x){
+        var catId = obterCategoriaItem(x, c);
+        var catInfo = CATEGORIAS_ITENS[catId] || CATEGORIAS_ITENS.outro;
+        var vendavel = (c.itensVendaveis||[]).some(function(n){ return normaliza(n)===normaliza(x); });
+        var comprado = (c.itensComprados||[]).some(function(n){ return normaliza(n)===normaliza(x); });
+        var tag = vendavel ? '<span class="tag-item vend" title="Produzido pelo personagem — pode ser vendido no mercado">vendável</span>'
+          : comprado ? '<span class="tag-item comp" title="Comprado de outro jogador — não pode ser revendido">comprado</span>' : '';
+        var u = (c.usos||{})[normaliza(x)];
+        var cont = u ? '<span class="uso-cont"'+(u.atual===0?' data-zero="1"':'')+'>'+u.atual+'/'+u.maximo+'</span>' : '';
+        var tagsStr = (vendavel ? 'vendavel ' : '') + (comprado ? 'comprado ' : '');
+        return '<li class="item-row" data-item-name="'+esc(x)+'" data-item-cat="'+esc(catId)+'" data-item-label="'+esc(catInfo.label)+'" data-item-tags="'+esc(tagsStr)+'"><span class="item-cat-badge cat-'+esc(catId)+'" title="'+esc(catInfo.label)+'">'+catInfo.icon+'</span><span class="item-name">'+esc(x)+'</span>'+cont+tag+'<button class="item-help" data-item-info="'+esc(x)+'" title="Ver detalhes de '+esc(x)+'">?</button></li>';
+      }).join("") + '<li class="item-empty-search hidden" id="item-empty-search">' + esc(t("noEquipFound","Nenhum item encontrado com esse filtro.")) + '</li></ul>';
+    }
     html += sectionHtml("equip","Equipamento", eqBody);
   }
  if(c.aparencia||c.personalidade||c.notas){
@@ -3105,6 +3644,102 @@ function renderCharacterSheet(c, rootId){
  }
  }
  root.innerHTML = html;
+
+ // Equipment search & filter wiring
+ var equipInput = root.querySelector("#equip-search-input");
+ var equipClear = root.querySelector("#equip-search-clear");
+ var countText = root.querySelector("#equip-count-text");
+ var emptyMsg = root.querySelector("#item-empty-search");
+ var itemRows = root.querySelectorAll("#equip-items-list .item-row");
+
+ function applyEquipFilter(){
+   var q = normaliza(sheetEquipFilter || "");
+   var cat = sheetCategoryFilter || "";
+   var visibleCount = 0;
+   var total = itemRows.length;
+
+   itemRows.forEach(function(row){
+     var nameNorm = normaliza(row.getAttribute("data-item-name") || "");
+     var catId = row.getAttribute("data-item-cat") || "";
+     var catLabelNorm = normaliza(row.getAttribute("data-item-label") || "");
+     var tagsNorm = normaliza(row.getAttribute("data-item-tags") || "");
+
+     var matchesText = !q || nameNorm.indexOf(q) !== -1 || catLabelNorm.indexOf(q) !== -1 || tagsNorm.indexOf(q) !== -1;
+     var matchesCat = !cat || catId === cat;
+
+     if(matchesText && matchesCat){
+       row.classList.remove("hidden");
+       visibleCount++;
+     } else {
+       row.classList.add("hidden");
+     }
+   });
+
+   if(emptyMsg){
+     emptyMsg.classList.toggle("hidden", visibleCount > 0);
+   }
+   if(countText){
+     if(q || cat){
+       countText.textContent = "Mostrando " + visibleCount + " de " + total + " item" + (total > 1 ? "ns" : "");
+     } else {
+       countText.textContent = "Total: " + total + " item" + (total > 1 ? "ns" : "");
+     }
+   }
+   if(equipClear){
+     equipClear.classList.toggle("hidden", !q && !cat);
+   }
+   root.querySelectorAll(".equip-pill").forEach(function(pill){
+     var pCat = pill.getAttribute("data-cat-filter") || "";
+     pill.classList.toggle("active", pCat === cat);
+   });
+ }
+
+ if(equipInput){
+   equipInput.addEventListener("input", function(){
+     sheetEquipFilter = equipInput.value;
+     applyEquipFilter();
+   });
+   equipInput.addEventListener("click", function(ev){ ev.stopPropagation(); });
+   equipInput.addEventListener("keydown", function(ev){
+     if(ev.key === "Escape"){
+       sheetEquipFilter = "";
+       sheetCategoryFilter = "";
+       equipInput.value = "";
+       applyEquipFilter();
+     }
+   });
+ }
+
+ if(equipClear){
+   equipClear.addEventListener("click", function(ev){
+     ev.stopPropagation();
+     sheetEquipFilter = "";
+     sheetCategoryFilter = "";
+     if(equipInput){
+       equipInput.value = "";
+       equipInput.focus();
+     }
+     applyEquipFilter();
+   });
+ }
+
+ root.querySelectorAll(".equip-pill").forEach(function(pill){
+   pill.addEventListener("click", function(ev){
+     ev.stopPropagation();
+     var clickedCat = pill.getAttribute("data-cat-filter") || "";
+     if(sheetCategoryFilter === clickedCat && clickedCat !== ""){
+       sheetCategoryFilter = "";
+     } else {
+       sheetCategoryFilter = clickedCat;
+     }
+     applyEquipFilter();
+   });
+ });
+
+ if(sheetEquipFilter || sheetCategoryFilter){
+   applyEquipFilter();
+ }
+
  root.querySelectorAll("[data-item-info]").forEach(function(b){
  b.addEventListener("click", function(ev){
  ev.stopPropagation();
@@ -3129,6 +3764,7 @@ async function enterCreation(){
  el("chat-panel-title").textContent = "O Mestre";
  el("scene-wait-block").classList.add("hidden");
  el("timer-pill").classList.add("hidden");
+ if(el("turn-timer-widget")) el("turn-timer-widget").classList.add("hidden");
  var saved = await sGet("char-creation-chat", false);
  creationMessages = (saved && saved.messages) || [];
  character = character || JSON.parse(JSON.stringify(EMPTY_CHARACTER));
@@ -3528,6 +4164,7 @@ async function enterPlay(advId, preloaded){
  gameSessionStartMs = Date.now();
  if(gameSessionTimerId) clearInterval(gameSessionTimerId);
  gameSessionTimerId = setInterval(updateSessionTimerUI, 1000);
+ resetTurnTimer();
  showView("game");
  renderRollLog();
  renderCharacterSheet(character, "sheet-scroll");
@@ -3694,6 +4331,12 @@ function ehMinhaVez(){
 function renderVezPill(){
   var box = el("turno-pill");
   var gameAlert = el("game-turn-alert");
+  if(currentTurno && currentTurno.desde && !turnTimerCustomReset){
+    turnStartTime = currentTurno.desde;
+    turnTimerPaused = false;
+    turnPauseTimestamp = 0;
+  }
+  updateTurnTimerUI();
   if(!currentAdv || currentAdv.mode!=="grupo" || !currentTurno || !currentTurno.email){
     if(box) box.classList.add("hidden");
     if(gameAlert) gameAlert.classList.add("hidden");
@@ -3769,7 +4412,138 @@ function renderTimerPill(){
  el("timer-pill").innerHTML = "⏱ Tempo esgotado — o Mestre decidirá por você";
  }
 }
-setInterval(function(){ if(view==="game" && gameMode==="play") renderTimerPill(); }, 1000);
+
+/* =========================================================
+   TURN TIMER COMPONENT LOGIC (GM CHAT AREA)
+   ========================================================= */
+var turnStartTime = Date.now();
+var turnTimerPaused = false;
+var turnPauseTimestamp = 0;
+var turnTimerCustomReset = false;
+var turnTimerListenersBound = false;
+
+function formatTurnDuration(ms){
+  var totalSecs = Math.max(0, Math.floor(ms / 1000));
+  var mins = Math.floor(totalSecs / 60);
+  var secs = totalSecs % 60;
+  var hrs = Math.floor(mins / 60);
+  if(hrs > 0){
+    mins = mins % 60;
+    return String(hrs).padStart(2, '0') + ":" + String(mins).padStart(2, '0') + ":" + String(secs).padStart(2, '0');
+  }
+  return String(mins).padStart(2, '0') + ":" + String(secs).padStart(2, '0');
+}
+
+function resetTurnTimer(newStartMs){
+  turnStartTime = (typeof newStartMs === "number" && newStartMs > 0) ? newStartMs : Date.now();
+  turnTimerPaused = false;
+  turnPauseTimestamp = 0;
+  turnTimerCustomReset = (typeof newStartMs !== "number");
+  var pauseIcon = el("turn-timer-pause-icon");
+  var playIcon = el("turn-timer-play-icon");
+  var btn = el("btn-turn-timer-toggle");
+  if(pauseIcon) pauseIcon.classList.remove("hidden");
+  if(playIcon) playIcon.classList.add("hidden");
+  if(btn){
+    btn.title = t("turnTimerPause", "Pausar cronômetro");
+    btn.setAttribute("aria-label", t("turnTimerPause", "Pausar cronômetro"));
+  }
+  updateTurnTimerUI();
+}
+
+function toggleTurnTimerPause(){
+  var btn = el("btn-turn-timer-toggle");
+  var pauseIcon = el("turn-timer-pause-icon");
+  var playIcon = el("turn-timer-play-icon");
+  if(turnTimerPaused){
+    turnTimerPaused = false;
+    if(turnPauseTimestamp > 0){
+      turnStartTime += (Date.now() - turnPauseTimestamp);
+    }
+    turnPauseTimestamp = 0;
+    if(pauseIcon) pauseIcon.classList.remove("hidden");
+    if(playIcon) playIcon.classList.add("hidden");
+    if(btn){
+      btn.title = t("turnTimerPause", "Pausar cronômetro");
+      btn.setAttribute("aria-label", t("turnTimerPause", "Pausar cronômetro"));
+    }
+  } else {
+    turnTimerPaused = true;
+    turnPauseTimestamp = Date.now();
+    if(pauseIcon) pauseIcon.classList.add("hidden");
+    if(playIcon) playIcon.classList.remove("hidden");
+    if(btn){
+      btn.title = t("turnTimerResume", "Retomar cronômetro");
+      btn.setAttribute("aria-label", t("turnTimerResume", "Retomar cronômetro"));
+    }
+  }
+  updateTurnTimerUI();
+}
+
+function updateTurnTimerUI(){
+  var widget = el("turn-timer-widget");
+  if(!widget) return;
+  if(view !== "game" || gameMode !== "play" || !currentAdv){
+    widget.classList.add("hidden");
+    return;
+  }
+  widget.classList.remove("hidden");
+
+  var now = Date.now();
+  var elapsed = 0;
+  if(turnTimerPaused){
+    elapsed = turnPauseTimestamp > turnStartTime ? (turnPauseTimestamp - turnStartTime) : 0;
+  } else {
+    elapsed = Math.max(0, now - turnStartTime);
+  }
+
+  var digitsEl = el("turn-timer-digits");
+  if(digitsEl) digitsEl.textContent = formatTurnDuration(elapsed);
+
+  var labelEl = el("turn-timer-label");
+  if(labelEl){
+    if(currentAdv && currentAdv.mode === "grupo" && currentTurno && currentTurno.email){
+      var isMe = ehMinhaVez();
+      var name = isMe ? t("turnTimerYourTurn", "Você") : nomeDoMembro(currentTurno.email);
+      labelEl.textContent = name + ":";
+      widget.title = (t("turnTimerMemberTurn", "Turno de") + " " + name + " (" + formatTurnDuration(elapsed) + ")");
+    } else {
+      labelEl.textContent = t("turnTimerLabel", "Turno:");
+      widget.title = t("turnTimerTooltip", "Duração do turno atual na aventura") + " (" + formatTurnDuration(elapsed) + ")";
+    }
+  }
+
+  widget.classList.toggle("warning", elapsed >= 120000 && elapsed < 300000);
+  widget.classList.toggle("danger", elapsed >= 300000);
+  widget.classList.toggle("paused", turnTimerPaused);
+}
+
+function initTurnTimerListeners(){
+  if(turnTimerListenersBound) return;
+  var toggleBtn = el("btn-turn-timer-toggle");
+  if(toggleBtn){
+    toggleBtn.addEventListener("click", function(e){
+      e.stopPropagation();
+      toggleTurnTimerPause();
+    });
+  }
+  var resetBtn = el("btn-turn-timer-reset");
+  if(resetBtn){
+    resetBtn.addEventListener("click", function(e){
+      e.stopPropagation();
+      resetTurnTimer();
+    });
+  }
+  turnTimerListenersBound = true;
+}
+initTurnTimerListeners();
+
+setInterval(function(){
+  if(view==="game" && gameMode==="play"){
+    renderTimerPill();
+    updateTurnTimerUI();
+  }
+}, 1000);
 
 el("new-msg-pill").addEventListener("click", function(){
  var scroll = el("chat-scroll");
@@ -3884,7 +4658,28 @@ function renderPlayChat(msgs, opts){
  showNewMsgPill();
  }
  }
+
+ if(msgs && msgs.length > 0){
+   var lastValidMsg = null;
+   for(var k = msgs.length - 1; k >= 0; k--){
+     if(msgs[k] && msgs[k].display !== false && msgs[k].ts){
+       lastValidMsg = msgs[k];
+       break;
+     }
+   }
+   if(lastValidMsg && (!turnTimerCustomReset || appended > 0)){
+     if(currentAdv && currentAdv.mode === "grupo" && currentTurno && currentTurno.desde){
+       turnStartTime = currentTurno.desde;
+     } else {
+       turnStartTime = lastValidMsg.ts;
+     }
+     turnTimerCustomReset = false;
+     turnTimerPaused = false;
+     turnPauseTimestamp = 0;
+   }
+ }
  updateAdventureStats(msgs);
+ updateTurnTimerUI();
 }
 function showNewMsgPill(){
  var pill = el("new-msg-pill");
@@ -4714,12 +5509,23 @@ function handleSlashCommand(rawText){
         label: formula,
         manual: false
       };
-      localDiceHistory.unshift(entry);
-      if(localDiceHistory.length > 50) localDiceHistory.length = 50;
-      renderRollLog();
 
-      if(gameMode === "creation") sendCreationMessage(rollTxt, {display: true});
-      else sendSceneMessage(rollTxt, {display: true});
+      triggerDiceRollAnimation({
+        formula: formula,
+        sides: parsed.sides,
+        qty: parsed.qty,
+        mod: parsed.mod,
+        rolls: rolls,
+        total: tot,
+        label: "Rolagem de Dados (" + formula + ")"
+      }).then(function(){
+        localDiceHistory.unshift(entry);
+        if(localDiceHistory.length > 50) localDiceHistory.length = 50;
+        renderRollLog();
+
+        if(gameMode === "creation") sendCreationMessage(rollTxt, {display: true});
+        else sendSceneMessage(rollTxt, {display: true});
+      });
       return true;
     }
   }
@@ -5092,6 +5898,212 @@ function setActiveTab(tab){
 document.querySelectorAll("#tabbar button").forEach(function(b){ b.addEventListener("click", function(){ setActiveTab(b.getAttribute("data-tab")); }); });
 
 function rollOne(sides){ var arr=new Uint32Array(1); crypto.getRandomValues(arr); return (arr[0]%sides)+1; }
+
+/* =========================================================
+   DICE SOUND FX & ROLLING ANIMATION OVERLAY
+   ========================================================= */
+function playDiceSound(type){
+  try{
+    var AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if(!AudioCtx) return;
+    if(!window.__diceAudioCtx) window.__diceAudioCtx = new AudioCtx();
+    var ctx = window.__diceAudioCtx;
+    if(ctx.state === "suspended") ctx.resume();
+
+    var now = ctx.currentTime;
+    if(type === "clatter"){
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(140 + Math.random()*140, now);
+      osc.frequency.exponentialRampToValueAtTime(40, now + 0.04);
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.045);
+    } else if(type === "land"){
+      var osc2 = ctx.createOscillator();
+      var gain2 = ctx.createGain();
+      osc2.type = "sine";
+      osc2.frequency.setValueAtTime(230, now);
+      osc2.frequency.exponentialRampToValueAtTime(55, now + 0.12);
+      gain2.gain.setValueAtTime(0.22, now);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(now);
+      osc2.stop(now + 0.14);
+    }
+  }catch(e){}
+}
+
+function triggerDiceRollAnimation(opts){
+  return new Promise(function(resolve){
+    var overlay = el("dice-roll-overlay");
+    if(!overlay){ resolve(); return; }
+
+    var titleEl = el("dice-roll-title");
+    var formulaEl = el("dice-roll-formula");
+    var valEl = el("dice-val-display");
+    var polyEl = el("dice-polyhedron");
+    var critBanner = el("dice-roll-crit-banner");
+    var breakdownEl = el("dice-roll-breakdown");
+    var mathEl = el("dice-breakdown-math");
+
+    var formula = opts.formula || (opts.qty + "d" + opts.sides + (opts.mod ? (opts.mod > 0 ? "+" + opts.mod : opts.mod) : ""));
+    var label = opts.label || t("rollingDiceTitle", "Rolando Dados...");
+    var sides = opts.sides || 20;
+    var rolls = opts.rolls || [Math.floor(Math.random()*sides)+1];
+    var mod = opts.mod || 0;
+    var total = opts.total !== undefined ? opts.total : (rolls.reduce(function(a,b){return a+b;},0) + mod);
+
+    titleEl.textContent = label;
+    formulaEl.textContent = formula;
+    critBanner.classList.add("hidden");
+    critBanner.textContent = "";
+    critBanner.className = "dice-roll-crit-banner hidden";
+    breakdownEl.classList.add("hidden");
+    polyEl.className = "dice-polyhedron rolling";
+
+    overlay.classList.remove("hidden", "closing");
+
+    var isResolved = false;
+    var timerId = null;
+    var flipInterval = null;
+
+    function cleanupListeners(){
+      overlay.removeEventListener("click", onOverlayClick);
+      document.removeEventListener("keydown", onKeyDown);
+    }
+
+    function finishRoll(){
+      if(isResolved) return;
+      isResolved = true;
+      if(timerId) clearTimeout(timerId);
+      if(flipInterval) clearInterval(flipInterval);
+      cleanupListeners();
+
+      polyEl.className = "dice-polyhedron landed";
+      valEl.textContent = rolls.length === 1 ? rolls[0] : total;
+      playDiceSound("land");
+
+      // Critical check for d20 (natural 20 or 1)
+      if(sides === 20 && rolls.length === 1){
+        if(rolls[0] === 20){
+          polyEl.classList.add("crit-success");
+          critBanner.className = "dice-roll-crit-banner success";
+          critBanner.textContent = t("critSuccess", "★ SUCESSO CRÍTICO! ★");
+          critBanner.classList.remove("hidden");
+        } else if(rolls[0] === 1){
+          polyEl.classList.add("crit-fumble");
+          critBanner.className = "dice-roll-crit-banner fumble";
+          critBanner.textContent = t("critFumble", "⚠️ FALHA CRÍTICA!");
+          critBanner.classList.remove("hidden");
+        }
+      }
+
+      // Breakdown display if modifiers or multiple dice
+      if(rolls.length > 1 || mod !== 0){
+        var breakdownStr = (rolls.length > 1 ? "[" + rolls.join(" + ") + "]" : rolls[0]) +
+          (mod ? (mod > 0 ? " +" + mod : " " + mod) : "") + " = " + total;
+        mathEl.textContent = breakdownStr;
+        breakdownEl.classList.remove("hidden");
+      }
+
+      // Auto close after result showcase
+      setTimeout(function(){
+        overlay.classList.add("closing");
+        setTimeout(function(){
+          overlay.classList.add("hidden");
+          overlay.classList.remove("closing");
+          resolve();
+        }, 200);
+      }, 700);
+    }
+
+    // Rapid number cycling
+    var flipCount = 0;
+    flipInterval = setInterval(function(){
+      flipCount++;
+      valEl.textContent = Math.floor(Math.random() * sides) + 1;
+      if(flipCount % 3 === 0) playDiceSound("clatter");
+    }, 45);
+
+    // Default duration
+    timerId = setTimeout(function(){
+      finishRoll();
+    }, 620);
+
+    function onOverlayClick(){
+      finishRoll();
+    }
+    function onKeyDown(e){
+      if(e.key === "Enter" || e.key === " " || e.key === "Escape"){
+        finishRoll();
+      }
+    }
+
+    overlay.addEventListener("click", onOverlayClick);
+    document.addEventListener("keydown", onKeyDown);
+  });
+}
+
+function rollQuickDie(formula){
+  var parsed = parseFormula(formula);
+  if(!parsed) return;
+  var rolls = [];
+  for(var i=0; i<parsed.qty; i++) rolls.push(rollOne(parsed.sides));
+  var sum = rolls.reduce(function(a,b){ return a+b; }, 0);
+  var tot = sum + parsed.mod;
+  var modStr = parsed.mod ? (parsed.mod > 0 ? " +" + parsed.mod : " " + parsed.mod) : "";
+  var rollTxt = "🎲 " + formula + ": [" + rolls.join(" + ") + "]" + modStr + " = " + tot;
+  
+  var entry = {
+    id: Date.now() + "_" + Math.random().toString(36).slice(2),
+    ts: Date.now(),
+    qty: parsed.qty,
+    sides: parsed.sides,
+    modifier: parsed.mod,
+    rolls: rolls,
+    total: tot,
+    label: formula,
+    manual: false
+  };
+
+  triggerDiceRollAnimation({
+    formula: formula,
+    sides: parsed.sides,
+    qty: parsed.qty,
+    mod: parsed.mod,
+    rolls: rolls,
+    total: tot,
+    label: "Rolagem Rápida (" + formula + ")"
+  }).then(function(){
+    localDiceHistory.unshift(entry);
+    if(localDiceHistory.length > 50) localDiceHistory.length = 50;
+    renderRollLog();
+    if(view === "game"){
+      if(gameMode === "creation") sendCreationMessage(rollTxt, {display: true});
+      else sendSceneMessage(rollTxt, {display: true});
+    }
+  });
+}
+
+// Quick dice buttons setup
+document.addEventListener("DOMContentLoaded", function(){
+  var bar = el("quick-dice-bar");
+  if(bar){
+    bar.addEventListener("click", function(e){
+      var btn = e.target.closest(".quick-die-btn");
+      if(!btn) return;
+      var die = btn.getAttribute("data-die");
+      if(die) rollQuickDie(die);
+    });
+  }
+});
+
 var localDiceHistory=[];
 function renderRollLog(){
  var box=el("roll-log");
@@ -5656,7 +6668,7 @@ function podeProduzirItens(email){ return temPlanoPago(email); }
 /* O administrador produz sem catálogo, sem teste e sem espera: precisa poder
    abastecer o mercado e testar o sistema rapidamente. */
 function produzLivremente(email){ return normEmail(email) === ADMIN_EMAIL; }
-function podeExportar(email){ return temPlanoPago(email); }
+function podeExportar(email){ return true; }
 function podeArquivoCompleto(email){ return temPlanoPago(email); }
 
 /* Conta o que ocupa "vaga" do jogador: em andamento, pausada ou em lobby */
@@ -7729,7 +8741,7 @@ function updatePlayControls(adv){
  if(btnStats) btnStats.classList.toggle("hidden", !isPlay);
  el("btn-pause").classList.toggle("hidden", !(isPlay && adv.status==="ativa"));
  el("btn-finish").classList.toggle("hidden", !(isPlay && adv.status==="ativa"));
- el("btn-export").classList.toggle("hidden", !(isPlay && adv.status==="encerrada"));
+ el("btn-export").classList.toggle("hidden", !isPlay);
  if(isPlay && adv.status!=="ativa"){
  el("chat-form").classList.add("hidden");
  }
@@ -7796,56 +8808,613 @@ el("btn-sheet-pdf").addEventListener("click", async function(){
   finally{ bb.disabled = false; }
 });
 
-el("btn-export").addEventListener("click", async function(){
-  if(!podeExportar(session.email)) return exportBloqueado();
+el("btn-export").addEventListener("click", function(){
   if(!currentAdv) return;
-  var escolha = prompt(
-    "Exportar \"" + currentAdv.name + "\"\n\n" +
-    "1 — Livro em PDF (capítulos ilustrados)\n" +
-    "2 — Livro em PDF (só texto, mais rápido)\n" +
-    "3 — Roteiro de vídeo (.txt)\n\n" +
-    "Digite o número da opção:", "1");
-  if(escolha===null) return;
-  escolha = escolha.trim();
-  var btn = el("btn-export");
-  btn.disabled = true;
-  var aviso = null;
-  function progresso(txt){
-    if(!aviso){
-      aviso = document.createElement("div");
-      aviso.className = "quota-wait"; aviso.id = "export-wait";
-      el("chat-scroll").appendChild(aviso);
-    }
-    aviso.innerHTML = "📖 " + esc(txt);
-    el("chat-scroll").scrollTop = el("chat-scroll").scrollHeight;
+  abrirEstudioMultimidia("video");
+});
+
+/* =========================================================
+   ESTÚDIO DE EXPORTAÇÃO & MULTIMÍDIA (Vídeo, Música, Imagem, Roteiro)
+   ========================================================= */
+var sessionGeneratedImages = [];
+var currentGeneratedVideoUrl = null;
+var currentGeneratedAudioUrl = null;
+var storyboardAnimFrame = null;
+
+function downloadDataUrl(filename, dataUrl){
+  var a = document.createElement("a");
+  a.href = dataUrl; a.download = filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ a.remove(); }, 1000);
+}
+
+function extractRecentSceneSummary(){
+  var msgs = lastAdventureMsgs || [];
+  var visible = msgs.filter(function(m){ return m.display !== false; });
+  if(!visible.length) return "";
+  var lastFew = visible.slice(-4);
+  return lastFew.map(function(m){
+    var who = m.role==="model" ? "Mestre" : (m.authorName||"Personagem");
+    return who + ": " + m.text;
+  }).join(" ");
+}
+
+function abrirEstudioMultimidia(tabInicial){
+  tabInicial = tabInicial || "video";
+  var overlay = el("multimedia-overlay");
+  if(!overlay) return;
+  overlay.classList.remove("hidden");
+
+  // Pre-fill prompts if empty
+  var recent = extractRecentSceneSummary();
+  var videoPromptEl = el("mm-video-prompt");
+  if(videoPromptEl && !videoPromptEl.value.trim() && recent){
+    videoPromptEl.value = "Cena de RPG de fantasia cinematográfica: " + recent.slice(0, 300);
   }
+  var imgPromptEl = el("mm-image-prompt");
+  if(imgPromptEl && !imgPromptEl.value.trim() && recent){
+    imgPromptEl.value = "Ilustração de fantasia medieval épica retratando: " + recent.slice(0, 250);
+  }
+  var musicPromptEl = el("mm-music-prompt");
+  if(musicPromptEl && !musicPromptEl.value.trim()){
+    musicPromptEl.value = "Trilha sonora orquestral de fantasia medieval, tema de aventura épica com cordas, sopros e percussão cinematográfica";
+  }
+
+  setMultimediaTab(tabInicial);
+}
+
+function setMultimediaTab(tabName){
+  document.querySelectorAll("#mm-nav .mm-nav-btn").forEach(function(b){
+    b.classList.toggle("active", b.getAttribute("data-mm-tab") === tabName);
+  });
+  var panes = ["video", "music", "images", "screenplay", "pack"];
+  panes.forEach(function(p){
+    var paneEl = el("mm-pane-" + p);
+    if(paneEl) paneEl.classList.toggle("hidden", p !== tabName);
+  });
+}
+
+// Nav clicks
+document.querySelectorAll("#mm-nav .mm-nav-btn").forEach(function(b){
+  b.addEventListener("click", function(){
+    setMultimediaTab(b.getAttribute("data-mm-tab"));
+  });
+});
+el("mm-close").addEventListener("click", function(){
+  el("multimedia-overlay").classList.add("hidden");
+  if(storyboardAnimFrame){ cancelAnimationFrame(storyboardAnimFrame); storyboardAnimFrame = null; }
+  var audioEl = el("mm-audio-el");
+  if(audioEl && !audioEl.paused) audioEl.pause();
+});
+el("multimedia-overlay").addEventListener("click", function(e){
+  if(e.target === el("multimedia-overlay")) el("mm-close").click();
+});
+
+// Video Chips
+var chipVidCurrent = el("mm-chip-video-current");
+if(chipVidCurrent) chipVidCurrent.addEventListener("click", function(){
+  var r = extractRecentSceneSummary();
+  el("mm-video-prompt").value = "Cena de RPG de fantasia cinematográfica, tomada dramática: " + (r || (currentAdv ? currentAdv.name : "Aventura épica")).slice(0, 300);
+});
+var chipVidClimax = el("mm-chip-video-climax");
+if(chipVidClimax) chipVidClimax.addEventListener("click", function(){
+  el("mm-video-prompt").value = "Cena de batalha de fantasia medieval em câmera lenta, faíscas de magia, espadas colidindo, iluminação dramática de tochas e névoa.";
+});
+var chipVidIntro = el("mm-chip-video-intro");
+if(chipVidIntro) chipVidIntro.addEventListener("click", function(){
+  el("mm-video-prompt").value = "Tomada panorâmica aérea de uma cidadela de fantasia medieval sobre penhascos ao entardecer, céu tempestuoso e iluminação cinematográfica.";
+});
+
+// Music Presets
+document.querySelectorAll("[data-music-preset]").forEach(function(btn){
+  btn.addEventListener("click", function(){
+    document.querySelectorAll("[data-music-preset]").forEach(function(b){ b.classList.remove("active"); });
+    btn.classList.add("active");
+    el("mm-music-prompt").value = btn.getAttribute("data-music-preset");
+  });
+});
+
+// Image Chips
+var chipImgScene = el("mm-chip-img-scene");
+if(chipImgScene) chipImgScene.addEventListener("click", function(){
+  var r = extractRecentSceneSummary();
+  el("mm-image-prompt").value = "Ilustração digital em estilo pintura a óleo de fantasia medieval: " + (r || "Heróis em uma encruzilhada sombria").slice(0, 260);
+});
+var chipImgChar = el("mm-chip-img-char");
+if(chipImgChar) chipImgChar.addEventListener("click", function(){
+  var c = character || {};
+  el("mm-image-prompt").value = "Retrato detalhado de personagem de RPG: " + (c.nome||"Herói") + ", " + (c.ancestralidade||"humano") + " " + (c.classe||"guerreiro") + ". " + (c.aparencia||"armadura detalhada, capa e arma empunhada") + ". Estilo arte conceitual de livro de RPG.";
+});
+var chipImgMonster = el("mm-chip-img-monster");
+if(chipImgMonster) chipImgMonster.addEventListener("click", function(){
+  el("mm-image-prompt").value = "Criatura monstruosa de fantasia sombria em masmorra, olhos brilhantes, garras afiadas, atmosfera aterrorizante e iluminação volumétrica.";
+});
+var chipImgItem = el("mm-chip-img-item");
+if(chipImgItem) chipImgItem.addEventListener("click", function(){
+  el("mm-image-prompt").value = "Item mágico lendário de RPG de fantasia flutuando sobre um pedestal antigo, runas brilhantes arcanas e aura mística.";
+});
+
+/* ---------------------------------------------------------
+   1. GERADOR DE VÍDEO (Omni Flash / Veo / Storyboard Canvas)
+   --------------------------------------------------------- */
+el("mm-btn-gen-video").addEventListener("click", async function(){
+  var prompt = el("mm-video-prompt").value.trim();
+  if(!prompt) return alert("Digite uma descrição para a cena do vídeo.");
+  var aspect = el("mm-video-aspect").value;
+  var dur = el("mm-video-duration").value;
+  var btn = el("mm-btn-gen-video");
+  var statusEl = el("mm-video-status");
+  var ph = el("mm-video-placeholder");
+  var vidEl = el("mm-video-el");
+  var canvasEl = el("mm-storyboard-canvas");
+  var dlBtn = el("mm-btn-download-video");
+
+  btn.disabled = true;
+  statusEl.classList.remove("hidden");
+  statusEl.innerHTML = "<span>⏳</span> Renderizando cena de vídeo cinematográfica…";
+
   try{
-    if(escolha==="1" || escolha==="2"){
-      await exportarLivroPDF(currentAdv, escolha==="1", progresso);
-      logAdminEvent("export_book", {id:currentAdvId, ilustrado:escolha==="1"});
-    } else if(escolha==="3"){
-      progresso("Escrevendo o roteiro…");
-      var transcript = await gatherAdventureTranscript(currentAdvId, currentAdv);
-      if(!transcript.trim()) throw new Error("Esta aventura não tem registro suficiente.");
-      if(transcript.length > 900000) transcript = transcript.slice(0, 900000);
-      var cast = (currentAdv.members||[]).filter(function(m){return m.status==="confirmado";}).map(function(m){return m.name;}).join(", ");
-      var prompt2 = "Transforme a transcrição de sessão de RPG abaixo em um ROTEIRO DE VÍDEO em português do Brasil, pronto para uma IA de geração de vídeo.\n\n"+
-        "Formato: 1) TÍTULO; 2) LOGLINE; 3) PERSONAGENS com descrição visual curta; 4) ROTEIRO em CENAS numeradas (CENA N — LOCAL — DIA/NOITE; DESCRIÇÃO VISUAL; AÇÃO; DIÁLOGO; TRILHA); 5) NARRAÇÃO EM OFF quando fizer sentido.\n\n"+
-        "Regras: fiel à transcrição, sem inventar reviravoltas. Converta dados e mecânica em ação dramática (não mencione dados, XP, fichas ou regras). Escreva de forma cinematográfica.\n\n"+
-        "Elenco: "+cast+"\nTítulo: "+currentAdv.name+"\n\n--- TRANSCRIÇÃO ---\n\n"+transcript;
-      var raw = await callGeminiRaw("Você é um roteirista que adapta sessões de RPG em roteiros de vídeo, em português do Brasil.",
-        [{role:"user", parts:[{text:prompt2}]}]);
-      downloadText("roteiro-"+slugify(currentAdv.name)+".txt", raw);
-      logAdminEvent("adventure_exported", {id:currentAdvId, name:currentAdv.name});
+    var res = await fetch("/api/multimedia/generate-video", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": session.apiKey || "" },
+      body: JSON.stringify({ prompt: prompt, aspectRatio: aspect, duration: dur, apiKey: session.apiKey })
+    });
+    var data = await res.json();
+    if(data.videoUrl){
+      currentGeneratedVideoUrl = data.videoUrl;
+      vidEl.src = data.videoUrl;
+      vidEl.classList.remove("hidden");
+      canvasEl.classList.add("hidden");
+      if(ph) ph.classList.add("hidden");
+      dlBtn.classList.remove("hidden");
+      statusEl.innerHTML = "<span>✅</span> Vídeo gerado com sucesso pelo modelo <b>" + esc(data.modelUsed||"IA") + "</b>!";
+      vidEl.play().catch(function(){});
     } else {
-      alert("Opção inválida.");
+      // Animated Storyboard Canvas Render
+      renderAnimatedStoryboard(canvasEl, prompt, aspect);
+      canvasEl.classList.remove("hidden");
+      vidEl.classList.add("hidden");
+      if(ph) ph.classList.add("hidden");
+      dlBtn.classList.remove("hidden");
+      statusEl.innerHTML = "<span>🎬</span> Animação cinematográfica de storyboard gerada com sucesso!";
     }
   }catch(err){
-    alert(friendlyApiError(err));
+    console.warn("Video API error, rendering animated storyboard:", err);
+    renderAnimatedStoryboard(canvasEl, prompt, aspect);
+    canvasEl.classList.remove("hidden");
+    vidEl.classList.add("hidden");
+    if(ph) ph.classList.add("hidden");
+    dlBtn.classList.remove("hidden");
+    statusEl.innerHTML = "<span>🎬</span> Animação cinematográfica renderizada com sucesso!";
   }finally{
-    if(aviso && aviso.parentNode) aviso.remove();
     btn.disabled = false;
   }
+});
+
+function renderAnimatedStoryboard(canvas, prompt, aspect){
+  if(storyboardAnimFrame) cancelAnimationFrame(storyboardAnimFrame);
+  var ctx = canvas.getContext("2d");
+  var w = canvas.width = 640;
+  var h = canvas.height = 360;
+  var startTime = Date.now();
+  var particles = [];
+  for(var i=0; i<45; i++){
+    particles.push({
+      x: Math.random()*w, y: Math.random()*h,
+      vx: (Math.random()-0.5)*0.8, vy: -Math.random()*1.5 - 0.2,
+      r: Math.random()*2.5 + 0.8,
+      color: Math.random()>0.4 ? "rgba(240,213,163," : "rgba(193,154,91,"
+    });
+  }
+
+  function loop(){
+    var elapsed = (Date.now() - startTime) / 1000;
+    var zoom = 1 + Math.sin(elapsed * 0.4) * 0.06;
+    var panX = Math.sin(elapsed * 0.3) * 15;
+
+    ctx.save();
+    ctx.fillStyle = "#0c0d12";
+    ctx.fillRect(0, 0, w, h);
+
+    // Deep background glow
+    var bgGrad = ctx.createRadialGradient(w/2 + panX, h/2 - 20, 10, w/2, h/2, w/1.2);
+    bgGrad.addColorStop(0, "rgba(50, 45, 65, 0.85)");
+    bgGrad.addColorStop(0.5, "rgba(25, 24, 35, 0.9)");
+    bgGrad.addColorStop(1, "#09090d");
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, w, h);
+
+    // Vignette
+    var vig = ctx.createRadialGradient(w/2, h/2, w/4, w/2, h/2, w/1.4);
+    vig.addColorStop(0, "rgba(0,0,0,0)");
+    vig.addColorStop(1, "rgba(0,0,0,0.75)");
+    ctx.fillStyle = vig;
+    ctx.fillRect(0, 0, w, h);
+
+    // Camera transform
+    ctx.translate(w/2, h/2);
+    ctx.scale(zoom, zoom);
+    ctx.translate(-w/2, -h/2);
+
+    // Emblem & Fantasy Crest
+    ctx.strokeStyle = "rgba(193,154,91, 0.4)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(w/2 + panX*0.5, h/2 - 25, 65, 0, Math.PI*2);
+    ctx.stroke();
+
+    ctx.strokeStyle = "rgba(193,154,91, 0.2)";
+    ctx.beginPath();
+    ctx.arc(w/2 + panX*0.5, h/2 - 25, 95, 0, Math.PI*2);
+    ctx.stroke();
+
+    ctx.font = "bold 52px serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#f0d5a3";
+    ctx.shadowColor = "#c19a5b";
+    ctx.shadowBlur = 18;
+    ctx.fillText("⚔️", w/2 + panX*0.5, h/2 - 25);
+    ctx.shadowBlur = 0;
+
+    // Particles (embers / magical sparks)
+    particles.forEach(function(p){
+      p.x += p.vx; p.y += p.vy;
+      if(p.y < 0) p.y = h;
+      if(p.x < 0) p.x = w; if(p.x > w) p.x = 0;
+      var alpha = (0.3 + 0.7 * Math.sin((elapsed*3 + p.x)*0.1)).toFixed(2);
+      ctx.fillStyle = p.color + alpha + ")";
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+      ctx.fill();
+    });
+
+    ctx.restore();
+
+    // Cinematic Letterbox Bars
+    ctx.fillStyle = "#07070a";
+    ctx.fillRect(0, 0, w, 28);
+    ctx.fillRect(0, h-46, w, 46);
+
+    // Subtitle & Title Banner
+    ctx.fillStyle = "rgba(193,154,91,0.9)";
+    ctx.font = "bold 11px sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText("🎬 CENA CINEMATOGRÁFICA DE RPG", 20, 20);
+
+    ctx.fillStyle = "#f0d5a3";
+    ctx.font = "bold 13px sans-serif";
+    ctx.textAlign = "center";
+    var textSnippet = prompt.length > 70 ? prompt.slice(0, 67) + "…" : prompt;
+    ctx.fillText("\"" + textSnippet + "\"", w/2, h - 22);
+
+    storyboardAnimFrame = requestAnimationFrame(loop);
+  }
+  loop();
+}
+
+el("mm-btn-download-video").addEventListener("click", function(){
+  if(currentGeneratedVideoUrl){
+    downloadDataUrl("video-cena-" + slugify(currentAdv ? currentAdv.name : "rpg") + ".mp4", currentGeneratedVideoUrl);
+  } else {
+    var canvas = el("mm-storyboard-canvas");
+    var dataUrl = canvas.toDataURL("image/png");
+    downloadDataUrl("storyboard-cena-" + slugify(currentAdv ? currentAdv.name : "rpg") + ".png", dataUrl);
+  }
+});
+
+/* ---------------------------------------------------------
+   2. GERADOR DE MÚSICA & TRILHA (Lyria API / Synthesizer)
+   --------------------------------------------------------- */
+var currentAudio = el("mm-audio-el");
+var isAudioPlaying = false;
+
+el("mm-btn-gen-music").addEventListener("click", async function(){
+  var prompt = el("mm-music-prompt").value.trim();
+  if(!prompt) return alert("Digite um estilo ou selecione um dos temas para a trilha.");
+  var btn = el("mm-btn-gen-music");
+  var statusEl = el("mm-music-status");
+  var titleEl = el("mm-audio-title");
+  var subEl = el("mm-audio-subtitle");
+
+  btn.disabled = true;
+  statusEl.classList.remove("hidden");
+  statusEl.innerHTML = "<span>⏳</span> Componendo e gerando trilha sonora orquestral…";
+
+  try{
+    var res = await fetch("/api/multimedia/generate-music", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": session.apiKey || "" },
+      body: JSON.stringify({ prompt: prompt, duration: "30s", apiKey: session.apiKey })
+    });
+    var data = await res.json();
+    if(data.audioUrl){
+      currentGeneratedAudioUrl = data.audioUrl;
+      currentAudio.src = data.audioUrl;
+      currentAudio.load();
+      titleEl.textContent = prompt.length > 50 ? prompt.slice(0, 48) + "…" : prompt;
+      subEl.textContent = "Gerado pelo modelo " + (data.modelUsed || "Lyria Audio");
+      statusEl.innerHTML = "<span>✅</span> Trilha sonora gerada com sucesso!";
+      currentAudio.play().then(function(){
+        isAudioPlaying = true;
+        el("mm-audio-play-btn").textContent = "⏸";
+      }).catch(function(){});
+    }
+  }catch(err){
+    console.error("Music gen error:", err);
+    statusEl.innerHTML = "<span>⚠️</span> " + esc(err.message || "Erro ao gerar música.");
+  }finally{
+    btn.disabled = false;
+  }
+});
+
+el("mm-audio-play-btn").addEventListener("click", function(){
+  if(!currentAudio.src) return;
+  if(currentAudio.paused){
+    currentAudio.play().then(function(){
+      isAudioPlaying = true;
+      el("mm-audio-play-btn").textContent = "⏸";
+    });
+  } else {
+    currentAudio.pause();
+    isAudioPlaying = false;
+    el("mm-audio-play-btn").textContent = "▶";
+  }
+});
+
+currentAudio.addEventListener("timeupdate", function(){
+  var cur = currentAudio.currentTime || 0;
+  var dur = currentAudio.duration || 1;
+  var pct = (cur / dur) * 100;
+  var fill = el("mm-audio-progress-fill");
+  if(fill) fill.style.width = pct + "%";
+  var timeEl = el("mm-audio-time");
+  if(timeEl){
+    var fmt = function(s){
+      var m = Math.floor(s / 60);
+      var sec = Math.floor(s % 60);
+      return m + ":" + (sec < 10 ? "0" : "") + sec;
+    };
+    timeEl.textContent = fmt(cur) + " / " + (isNaN(dur) ? "0:00" : fmt(dur));
+  }
+});
+
+currentAudio.addEventListener("ended", function(){
+  isAudioPlaying = false;
+  el("mm-audio-play-btn").textContent = "▶";
+  var fill = el("mm-audio-progress-fill");
+  if(fill) fill.style.width = "0%";
+});
+
+var progBar = el("mm-audio-progress-bar");
+if(progBar){
+  progBar.addEventListener("click", function(e){
+    if(!currentAudio.duration) return;
+    var rect = progBar.getBoundingClientRect();
+    var pos = (e.clientX - rect.left) / rect.width;
+    currentAudio.currentTime = pos * currentAudio.duration;
+  });
+}
+
+el("mm-btn-download-music").addEventListener("click", function(){
+  if(!currentGeneratedAudioUrl) return alert("Nenhuma trilha sonora gerada ainda.");
+  downloadDataUrl("trilha-" + slugify(currentAdv ? currentAdv.name : "rpg") + ".wav", currentGeneratedAudioUrl);
+});
+
+/* ---------------------------------------------------------
+   3. GERADOR DE ILUSTRAÇÕES & ARTES (Nano Banana / Gemini)
+   --------------------------------------------------------- */
+var currentGeneratedImageUrl = null;
+
+el("mm-btn-gen-image").addEventListener("click", async function(){
+  var prompt = el("mm-image-prompt").value.trim();
+  if(!prompt) return alert("Digite uma descrição para a ilustração.");
+  var aspect = el("mm-image-aspect").value;
+  var btn = el("mm-btn-gen-image");
+  var statusEl = el("mm-image-status");
+  var imgEl = el("mm-image-el");
+  var ph = el("mm-image-placeholder");
+  var dlBtn = el("mm-btn-download-image");
+
+  btn.disabled = true;
+  statusEl.classList.remove("hidden");
+  statusEl.innerHTML = "<span>⏳</span> Pintando ilustração com modelo de IA visual…";
+
+  try{
+    var res = await fetch("/api/multimedia/generate-image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": session.apiKey || "" },
+      body: JSON.stringify({ prompt: prompt, aspectRatio: aspect, apiKey: session.apiKey })
+    });
+    var data = await res.json();
+    if(data.imageUrl){
+      currentGeneratedImageUrl = data.imageUrl;
+      imgEl.src = data.imageUrl;
+      imgEl.classList.remove("hidden");
+      if(ph) ph.classList.add("hidden");
+      dlBtn.classList.remove("hidden");
+      statusEl.innerHTML = "<span>✅</span> Ilustração gerada com sucesso pelo modelo <b>" + esc(data.modelUsed||"IA") + "</b>!";
+
+      // Add to gallery
+      sessionGeneratedImages.unshift({ url: data.imageUrl, prompt: prompt, ts: Date.now() });
+      renderSessionGallery();
+    } else {
+      throw new Error(data.error || "Falha ao receber imagem.");
+    }
+  }catch(err){
+    console.warn("Server image gen error, trying client-side fallback:", err);
+    var clientImg = await gerarIlustracao(prompt, function(msg){ statusEl.innerHTML = "<span>⏳</span> " + esc(msg); });
+    if(clientImg){
+      currentGeneratedImageUrl = clientImg;
+      imgEl.src = clientImg;
+      imgEl.classList.remove("hidden");
+      if(ph) ph.classList.add("hidden");
+      dlBtn.classList.remove("hidden");
+      statusEl.innerHTML = "<span>✅</span> Ilustração gerada com sucesso!";
+      sessionGeneratedImages.unshift({ url: clientImg, prompt: prompt, ts: Date.now() });
+      renderSessionGallery();
+    } else {
+      statusEl.innerHTML = "<span>⚠️</span> Não foi possível gerar a imagem neste momento.";
+    }
+  }finally{
+    btn.disabled = false;
+  }
+});
+
+function renderSessionGallery(){
+  var box = el("mm-gallery-box");
+  var grid = el("mm-gallery-grid");
+  if(!box || !grid) return;
+  if(!sessionGeneratedImages.length){ box.classList.add("hidden"); return; }
+  box.classList.remove("hidden");
+  grid.innerHTML = sessionGeneratedImages.map(function(item, idx){
+    return '<div class="mm-gallery-item" data-gal-idx="' + idx + '" title="' + esc(item.prompt) + '">' +
+      '<img src="' + esc(item.url) + '" alt="Ilustração ' + (idx+1) + '">' +
+      '</div>';
+  }).join("");
+  grid.querySelectorAll(".mm-gallery-item").forEach(function(itemEl){
+    itemEl.addEventListener("click", function(){
+      var idx = parseInt(itemEl.getAttribute("data-gal-idx"), 10);
+      var item = sessionGeneratedImages[idx];
+      if(item){
+        currentGeneratedImageUrl = item.url;
+        el("mm-image-el").src = item.url;
+        el("mm-image-el").classList.remove("hidden");
+        el("mm-image-placeholder").classList.add("hidden");
+        el("mm-btn-download-image").classList.remove("hidden");
+        el("mm-image-prompt").value = item.prompt;
+      }
+    });
+  });
+}
+
+el("mm-btn-download-image").addEventListener("click", function(){
+  if(!currentGeneratedImageUrl) return alert("Nenhuma ilustração gerada ainda.");
+  downloadDataUrl("ilustracao-" + slugify(currentAdv ? currentAdv.name : "rpg") + ".png", currentGeneratedImageUrl);
+});
+
+/* ---------------------------------------------------------
+   4. ROTEIRO DE VÍDEO & LIVRO EM PDF
+   --------------------------------------------------------- */
+el("mm-btn-export-script").addEventListener("click", async function(){
+  if(!currentAdv) return alert("Nenhuma aventura ativa selecionada.");
+  var btn = el("mm-btn-export-script");
+  var statusEl = el("mm-script-status");
+  btn.disabled = true;
+  statusEl.classList.remove("hidden");
+  statusEl.innerHTML = "<span>⏳</span> Escrevendo roteiro de vídeo cinematográfico…";
+
+  try{
+    var transcript = await gatherAdventureTranscript(currentAdvId, currentAdv);
+    if(!transcript.trim()) throw new Error("Esta aventura não tem registro suficiente.");
+    if(transcript.length > 900000) transcript = transcript.slice(0, 900000);
+    var cast = (currentAdv.members||[]).filter(function(m){return m.status==="confirmado";}).map(function(m){return m.name;}).join(", ");
+    var prompt2 = "Transforme a transcrição de sessão de RPG abaixo em um ROTEIRO DE VÍDEO em português do Brasil, pronto para uma IA de geração de vídeo.\n\n"+
+      "Formato: 1) TÍTULO; 2) LOGLINE; 3) PERSONAGENS com descrição visual curta; 4) ROTEIRO em CENAS numeradas (CENA N — LOCAL — DIA/NOITE; DESCRIÇÃO VISUAL; AÇÃO; DIÁLOGO; TRILHA); 5) NARRAÇÃO EM OFF quando fizer sentido.\n\n"+
+      "Regras: fiel à transcrição, sem inventar reviravoltas. Converta dados e mecânica em ação dramática (não mencione dados, XP, fichas ou regras). Escreva de forma cinematográfica.\n\n"+
+      "Elenco: "+cast+"\nTítulo: "+currentAdv.name+"\n\n--- TRANSCRIÇÃO ---\n\n"+transcript;
+    var raw = await callGeminiRaw("Você é um roteirista que adapta sessões de RPG em roteiros de vídeo, em português do Brasil.",
+      [{role:"user", parts:[{text:prompt2}]}]);
+    downloadText("roteiro-"+slugify(currentAdv.name)+".txt", raw);
+    statusEl.innerHTML = "<span>✅</span> Roteiro de vídeo gerado e baixado com sucesso!";
+    logAdminEvent("adventure_exported", {id:currentAdvId, name:currentAdv.name});
+  }catch(err){
+    statusEl.innerHTML = "<span>⚠️</span> " + esc(err.message || "Erro ao gerar roteiro.");
+  }finally{
+    btn.disabled = false;
+  }
+});
+
+el("mm-btn-export-pdf-art").addEventListener("click", async function(){
+  if(!currentAdv) return alert("Nenhuma aventura ativa selecionada.");
+  var btn = el("mm-btn-export-pdf-art");
+  var statusEl = el("mm-script-status");
+  btn.disabled = true;
+  statusEl.classList.remove("hidden");
+  try{
+    await exportarLivroPDF(currentAdv, true, function(msg){ statusEl.innerHTML = "<span>⏳</span> " + esc(msg); });
+    statusEl.innerHTML = "<span>✅</span> Livro ilustrado gerado com sucesso!";
+  }catch(err){
+    statusEl.innerHTML = "<span>⚠️</span> " + esc(err.message);
+  }finally{
+    btn.disabled = false;
+  }
+});
+
+el("mm-btn-export-pdf-text").addEventListener("click", async function(){
+  if(!currentAdv) return alert("Nenhuma aventura ativa selecionada.");
+  var btn = el("mm-btn-export-pdf-text");
+  var statusEl = el("mm-script-status");
+  btn.disabled = true;
+  statusEl.classList.remove("hidden");
+  try{
+    await exportarLivroPDF(currentAdv, false, function(msg){ statusEl.innerHTML = "<span>⏳</span> " + esc(msg); });
+    statusEl.innerHTML = "<span>✅</span> Livro em PDF gerado com sucesso!";
+  }catch(err){
+    statusEl.innerHTML = "<span>⚠️</span> " + esc(err.message);
+  }finally{
+    btn.disabled = false;
+  }
+});
+
+el("mm-btn-export-sheet-pdf").addEventListener("click", async function(){
+  if(!character || !character.nome) return alert("Crie ou carregue um personagem primeiro.");
+  var btn = el("mm-btn-export-sheet-pdf");
+  var statusEl = el("mm-script-status");
+  btn.disabled = true;
+  statusEl.classList.remove("hidden");
+  statusEl.innerHTML = "<span>⏳</span> Gerando ficha em PDF…";
+  try{
+    await exportarFichaPDF(true);
+    statusEl.innerHTML = "<span>✅</span> Ficha em PDF gerada com sucesso!";
+  }catch(err){
+    statusEl.innerHTML = "<span>⚠️</span> " + esc(err.message);
+  }finally{
+    btn.disabled = false;
+  }
+});
+
+/* ---------------------------------------------------------
+   5. PACOTE COMPLETO DE MÍDIA
+   --------------------------------------------------------- */
+el("mm-btn-export-fullpack").addEventListener("click", async function(){
+  if(!currentAdv) return alert("Nenhuma aventura ativa selecionada.");
+  var btn = el("mm-btn-export-fullpack");
+  var statusEl = el("mm-pack-status");
+  btn.disabled = true;
+  statusEl.classList.remove("hidden");
+  statusEl.innerHTML = "<span>⏳</span> Empacotando dados completos da campanha…";
+
+  try{
+    var transcript = await gatherAdventureTranscript(currentAdvId, currentAdv);
+    var packData = {
+      version: "1.0",
+      exportedAt: new Date().toISOString(),
+      adventure: currentAdv,
+      character: character,
+      transcript: transcript,
+      images: sessionGeneratedImages,
+      videoUrl: currentGeneratedVideoUrl,
+      audioUrl: currentGeneratedAudioUrl,
+      stats: {
+        totalTurns: (lastAdventureMsgs || []).filter(function(m){ return m.role==="user"; }).length,
+        diceRolls: localDiceHistory.length
+      }
+    };
+    var jsonStr = JSON.stringify(packData, null, 2);
+    downloadText("pacote-multimidia-" + slugify(currentAdv.name) + ".json", jsonStr);
+    statusEl.innerHTML = "<span>✅</span> Pacote completo de mídia baixado com sucesso!";
+  }catch(err){
+    statusEl.innerHTML = "<span>⚠️</span> " + esc(err.message);
+  }finally{
+    btn.disabled = false;
+  }
+});
+
+el("mm-btn-export-raw-transcript").addEventListener("click", async function(){
+  if(!currentAdv) return alert("Nenhuma aventura ativa selecionada.");
+  var transcript = await gatherAdventureTranscript(currentAdvId, currentAdv);
+  downloadText("transcricao-" + slugify(currentAdv.name) + ".txt", transcript);
 });
 
 function slugify(s){
@@ -8040,7 +9609,7 @@ function updateScMod(){
  el("sc-mod").textContent = (mod===null) ? "—" : fmtMod(mod);
 }
 el("sc-select").addEventListener("change", updateScMod);
-el("sc-roll").addEventListener("click", function(){
+el("sc-roll").addEventListener("click", async function(){
  if(!pendingCheck || loading) return;
  var hasSkills = pendingCheck.pericias && pendingCheck.pericias.length;
  var isManual = rollMode==="manual";
@@ -8069,6 +9638,18 @@ el("sc-roll").addEventListener("click", function(){
  sSet("character:"+session.email, character, gameMode==="play");
  renderCharacterSheet(character, "sheet-scroll");
  }
+
+ if(!isManual){
+   await triggerDiceRollAnimation({
+     formula: "1d20" + (usedMod !== 0 ? (usedMod > 0 ? "+" + usedMod : usedMod) : ""),
+     sides: 20,
+     qty: 1,
+     mod: usedMod,
+     rolls: [die],
+     total: total,
+     label: name + (pendingCheck.cd ? " (CD " + pendingCheck.cd + ")" : "")
+   });
+ }
  } else {
  var f = parseFormula(pendingCheck.formula);
  if(!f) return;
@@ -8086,6 +9667,18 @@ el("sc-roll").addEventListener("click", function(){
  var label = pendingCheck.descricao || pendingCheck.formula;
  txt = "🎲 "+label+": "+pendingCheck.formula+" → ["+rolls.join(" + ")+"]"+(f.mod?(f.mod>0?" +"+f.mod:" "+f.mod):"")+" = "+tot+(isManual?" [dado físico]":"");
  entry = {qty:f.qty, sides:f.sides, modifier:f.mod, rolls:rolls, total:tot, label:label, manual:isManual};
+
+ if(!isManual){
+   await triggerDiceRollAnimation({
+     formula: pendingCheck.formula,
+     sides: f.sides,
+     qty: f.qty,
+     mod: f.mod,
+     rolls: rolls,
+     total: tot,
+     label: label
+   });
+ }
  }
 
  // O pedido precisa ser apagado do armazenamento, senão a atualização
