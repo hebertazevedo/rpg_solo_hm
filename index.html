@@ -2352,14 +2352,16 @@ function skillMod(c, name){
  if(!found) return null;
  return computeSkillMod(c, found);
 } // 1000 XP advances a character one level
-var DEFAULT_MODEL_FALLBACK = "gemini-3.6-flash";
+var DEFAULT_MODEL_FALLBACK = "gemini-3.7-flash";
 /* Ordem de preferência conhecida (mais recente primeiro). Serve de reforço
    quando a API não lista tudo ou devolve nomes fora de ordem. */
 var MODELOS_CONHECIDOS = [
-  "gemini-3.7-flash","gemini-3.6-flash","gemini-3.5-flash","gemini-3.1-flash",
-  "gemini-3-flash","gemini-2.5-flash","gemini-2-flash",
-  "gemini-3.5-flash-lite","gemini-3.1-flash-lite","gemini-2.5-flash-lite","gemini-2-flash-lite",
-  "gemini-3.1-pro","gemini-2.5-pro"
+  "gemini-3.7-flash",
+  "gemini-3.6-flash",
+  "gemini-3.5-flash",
+  "gemini-3.1-flash-lite",
+  "gemini-flash-latest",
+  "gemini-3.1-pro-preview"
 ];
 var ADMIN_EMAIL = "azevedo.hebert@gmail.com";
 var SHEETS_URL = "https://script.google.com/macros/s/AKfycbxmw5O3rNuFOYStis1ShHG04-eCD5iJLY-J-rPTDanY2WNmIo0rPFKaSfggnkGOuQ8t/exec";
@@ -2826,80 +2828,136 @@ function friendlyApiError(err){
 }
 
 async function detectModelChain(apiKey){
- try{
- var res = await fetch(apiBase()+"/v1beta/models", { headers:{"x-goog-api-key":apiKey} });
- if(!res.ok) return [DEFAULT_MODEL_FALLBACK];
- var data = await res.json();
- var models = (data.models||[]).filter(function(m){
- return m.name && m.supportedGenerationMethods && m.supportedGenerationMethods.indexOf("generateContent")>=0;
- });
- function idOf(m){ return m.name.replace("models/",""); }
- function verKey(id){ return (id.match(/[\d]+(\.[\d]+)?/g)||["0"]).map(parseFloat); }
- function cmpVerDesc(idA, idB){
- var ka=verKey(idA), kb=verKey(idB);
- for(var i=0;i<Math.max(ka.length,kb.length);i++){
- var va=ka[i]||0, vb=kb[i]||0;
- if(va!==vb) return vb-va; // newest (highest version) first
- }
- var aPrev = /preview|exp|experimental/i.test(idA), bPrev = /preview|exp|experimental/i.test(idB);
- if(aPrev!==bPrev) return aPrev?1:-1; // stable before preview at same version
- return 0;
- }
- var flashCore = models.filter(function(m){
- var id=idOf(m);
- return /flash/i.test(id) && !/lite/i.test(id) && !/image/i.test(id) && !/tts/i.test(id) && !/8b/i.test(id);
- }).map(idOf).sort(cmpVerDesc);
- var flashLite = models.filter(function(m){
- var id=idOf(m);
- return /flash/i.test(id) && /lite/i.test(id) && !/image/i.test(id) && !/tts/i.test(id);
- }).map(idOf).sort(cmpVerDesc);
- var proModels = models.filter(function(m){
- var id=idOf(m);
- return /pro/i.test(id) && !/vision|image|tts/i.test(id);
- }).map(idOf).sort(cmpVerDesc);
- var disponiveis = {};
- models.forEach(function(m){ disponiveis[idOf(m)] = true; });
- // 1) ordem conhecida, filtrada pelo que a chave realmente oferece
- var chain = MODELOS_CONHECIDOS.filter(function(id){ return disponiveis[id]; });
- // 2) completa com o que a API listou e nao estava previsto
- chain = chain.concat(flashCore, flashLite, proModels);
- chain = chain.filter(function(id,idx){ return chain.indexOf(id)===idx; }); // dedupe
- return chain.length ? chain : [DEFAULT_MODEL_FALLBACK];
- }catch(e){ return [DEFAULT_MODEL_FALLBACK]; }
+  try{
+    // Check server models API first
+    var res = await fetch("/api/gemini/models", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey || "" },
+      body: JSON.stringify({ apiKey: apiKey || "" })
+    });
+    if(res.ok){
+      var data = await res.json();
+      var models = data.models || [];
+      if(models.length){
+        // Order by known priority
+        var knownInList = MODELOS_CONHECIDOS.filter(function(id){ return models.indexOf(id)>=0; });
+        var others = models.filter(function(m){
+          return MODELOS_CONHECIDOS.indexOf(m)===-1 && !/image|audio|video|tts|embed|lyria|veo/i.test(m);
+        });
+        var chain = knownInList.concat(others);
+        if(chain.length) return chain;
+      }
+    }
+  }catch(e){}
+
+  try{
+    if(apiKey){
+      var resDirect = await fetch(apiBase()+"/v1beta/models", { headers:{"x-goog-api-key":apiKey} });
+      if(resDirect.ok){
+        var dataDirect = await resDirect.json();
+        var modelsDirect = (dataDirect.models||[]).filter(function(m){
+          return m.name && m.supportedGenerationMethods && m.supportedGenerationMethods.indexOf("generateContent")>=0;
+        });
+        function idOf(m){ return m.name.replace("models/",""); }
+        var disponiveis = {};
+        modelsDirect.forEach(function(m){ disponiveis[idOf(m)] = true; });
+        var chainDirect = MODELOS_CONHECIDOS.filter(function(id){ return disponiveis[id]; });
+        if(chainDirect.length) return chainDirect;
+      }
+    }
+  }catch(e){}
+
+  return MODELOS_CONHECIDOS.slice();
 }
 
 
 async function callGeminiOnce(systemText, contents, model){
- var res;
- try{
- res = await fetch(apiBase()+"/v1beta/models/"+encodeURIComponent(model)+":generateContent", {
- method:"POST", headers:{"x-goog-api-key":session.apiKey, "Content-Type":"application/json"},
- body: JSON.stringify({ systemInstruction:{parts:[{text:systemText}]}, contents:contents, generationConfig:{maxOutputTokens:8192} })
- });
- }catch(netErr){
- // "Failed to fetch": queda de rede, wifi trocando, DNS. É passageiro.
- var e0 = new Error(netErr && netErr.message ? netErr.message : "Falha de rede");
- e0.isNetworkError = true;
- throw e0;
- }
- var data = await res.json().catch(function(){return null;});
- if(!res.ok){
- var msg = (data && data.error && data.error.message) ? data.error.message : ("Erro HTTP "+res.status);
- var err = new Error(msg);
- var status = (data && data.error && data.error.status) || "";
- err.isQuotaError = (res.status===429) || status==="RESOURCE_EXHAUSTED" || /quota|rate limit/i.test(msg);
- err.modeloInexistente = (res.status===404) || status==="NOT_FOUND" ||
- /not found|not supported|does not exist|is not found/i.test(msg);
- err.httpStatus = res.status;
- throw err;
- }
- var candidate = data && data.candidates && data.candidates[0];
- if(!candidate){ var br = data && data.promptFeedback && data.promptFeedback.blockReason; throw new Error(br? ("Resposta bloqueada ("+br+")."):"Nenhuma resposta recebida do modelo."); }
- if(candidate.finishReason==="SAFETY") throw new Error("A resposta foi bloqueada pelos filtros de segurança do modelo.");
- var parts = (candidate.content && candidate.content.parts) || [];
- var text = parts.map(function(p){ return p.text||""; }).join("");
- if(!text) throw new Error("O modelo retornou uma resposta vazia.");
- return text;
+  var chosenModel = model || session.model || DEFAULT_MODEL_FALLBACK;
+  var res, data;
+
+  // 1. Try server-side proxy route (/api/gemini/generate)
+  try{
+    res = await fetch("/api/gemini/generate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": session.apiKey || ""
+      },
+      body: JSON.stringify({
+        systemInstruction: systemText,
+        contents: contents,
+        model: chosenModel,
+        apiKey: session.apiKey || undefined,
+        generationConfig: { maxOutputTokens: 8192 }
+      })
+    });
+  }catch(netErr){
+    // Network failure to server
+    if(!session.apiKey){
+      var e0 = new Error(netErr && netErr.message ? netErr.message : "Falha de rede ao conectar com o servidor.");
+      e0.isNetworkError = true;
+      throw e0;
+    }
+  }
+
+  if(res && res.ok){
+    data = await res.json().catch(function(){ return null; });
+    var text = (data && data.text) || "";
+    if(!text && data && data.candidates && data.candidates[0]){
+      var parts = (data.candidates[0].content && data.candidates[0].content.parts) || [];
+      text = parts.map(function(p){ return p.text || ""; }).join("");
+    }
+    if(text) return text;
+  }
+
+  // If server returned a quota or model not found error
+  if(res && !res.ok){
+    data = await res.json().catch(function(){ return null; });
+    var msg = (data && data.error) ? (typeof data.error === "string" ? data.error : (data.error.message || JSON.stringify(data.error))) : ("Erro HTTP "+res.status);
+    var err = new Error(msg);
+    err.isQuotaError = (res.status===429) || /quota|resource_exhausted|rate limit/i.test(msg);
+    err.modeloInexistente = (res.status===404) || /not found|not supported|does not exist|is no longer available/i.test(msg);
+    err.httpStatus = res.status;
+
+    // If client has personal API key and server failed, try direct fallback
+    if(!session.apiKey){
+      throw err;
+    }
+  }
+
+  // 2. Direct browser fallback if user provided personal API key
+  if(session.apiKey){
+    try{
+      res = await fetch(apiBase()+"/v1beta/models/"+encodeURIComponent(chosenModel)+":generateContent", {
+        method:"POST",
+        headers:{"x-goog-api-key":session.apiKey, "Content-Type":"application/json"},
+        body: JSON.stringify({ systemInstruction:{parts:[{text:systemText}]}, contents:contents, generationConfig:{maxOutputTokens:8192} })
+      });
+    }catch(netErr){
+      var e1 = new Error(netErr && netErr.message ? netErr.message : "Falha de rede");
+      e1.isNetworkError = true;
+      throw e1;
+    }
+    data = await res.json().catch(function(){ return null; });
+    if(!res.ok){
+      var msg2 = (data && data.error && data.error.message) ? data.error.message : ("Erro HTTP "+res.status);
+      var err2 = new Error(msg2);
+      var status2 = (data && data.error && data.error.status) || "";
+      err2.isQuotaError = (res.status===429) || status2==="RESOURCE_EXHAUSTED" || /quota|rate limit/i.test(msg2);
+      err2.modeloInexistente = (res.status===404) || status2==="NOT_FOUND" || /not found|not supported|does not exist|is not found/i.test(msg2);
+      err2.httpStatus = res.status;
+      throw err2;
+    }
+    var candidate = data && data.candidates && data.candidates[0];
+    if(!candidate){ var br = data && data.promptFeedback && data.promptFeedback.blockReason; throw new Error(br? ("Resposta bloqueada ("+br+")."):"Nenhuma resposta recebida do modelo."); }
+    if(candidate.finishReason==="SAFETY") throw new Error("A resposta foi bloqueada pelos filtros de segurança do modelo.");
+    var parts2 = (candidate.content && candidate.content.parts) || [];
+    var text2 = parts2.map(function(p){ return p.text||""; }).join("");
+    if(!text2) throw new Error("O modelo retornou uma resposta vazia.");
+    return text2;
+  }
+
+  throw new Error("Não foi possível gerar a resposta do Mestre.");
 }
 
 /* Recuperação de cota.
@@ -3353,24 +3411,22 @@ el("auth-continue").addEventListener("click", async function(){
  var localProfile = await sGet("profile", false);
  var apiKey = (localProfile && normEmail(localProfile.email)===email) ? localProfile.apiKey : null;
  if(!apiKey){
- apiKey = el("auth-key").value.trim();
- if(!apiKey){ errBox.textContent="Este dispositivo ainda não tem sua chave — cole sua chave de API do Gemini."; errBox.classList.remove("hidden"); btn.disabled=false; btn.textContent="Continuar"; return; }
+ apiKey = el("auth-key").value.trim() || "";
  }
  session.email = email; session.name = pub.name; session.apiKey = apiKey;
  btn.textContent = "Verificando modelo…";
  session.modelChain = await detectModelChain(apiKey);
- session.model = session.modelChain[0];
+ session.model = session.modelChain[0] || DEFAULT_MODEL_FALLBACK;
  await sSet("profile", {email:email, name:pub.name, apiKey:apiKey, model:session.model, modelChain:session.modelChain, updatedAt:Date.now()}, false);
  } else {
  // SIGNUP
  var name = el("auth-name").value.trim();
  if(!name){ errBox.textContent="Informe seu nome."; errBox.classList.remove("hidden"); btn.disabled=false; btn.textContent="Continuar"; return; }
- var apiKey2 = el("auth-key").value.trim();
- if(!apiKey2){ errBox.textContent="Cole sua chave de API do Gemini para criar a conta."; errBox.classList.remove("hidden"); btn.disabled=false; btn.textContent="Continuar"; return; }
+ var apiKey2 = el("auth-key").value.trim() || "";
  session.email=email; session.name=name; session.apiKey=apiKey2;
  btn.textContent = "Verificando modelo…";
  session.modelChain = await detectModelChain(apiKey2);
- session.model = session.modelChain[0];
+ session.model = session.modelChain[0] || DEFAULT_MODEL_FALLBACK;
  await sSet("pub:"+email, {email:email, name:name, passwordHash:passHash, createdAt:Date.now()}, true);
  await sSet("profile", {email:email, name:name, apiKey:apiKey2, model:session.model, modelChain:session.modelChain, updatedAt:Date.now()}, false);
  logAdminEvent("signup", {email:email, name:name});
@@ -6978,35 +7034,58 @@ var MODELOS_IMAGEM = [
 var modelosImagemIndisponiveis = {};
 
 async function gerarImagemUmModelo(prompt, model){
-  var res;
+  // 1. Try server multimedia endpoint
   try{
-    res = await fetch(apiBase()+"/v1beta/models/"+encodeURIComponent(model)+":generateContent", {
-      method:"POST", headers:{"x-goog-api-key":session.apiKey,"Content-Type":"application/json"},
+    var resServer = await fetch("/api/multimedia/generate-image", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": session.apiKey || ""
+      },
       body: JSON.stringify({
-        contents:[{role:"user", parts:[{text:prompt}]}],
-        generationConfig:{responseModalities:["IMAGE"]}
+        prompt: prompt,
+        quality: model.indexOf("lite")>=0 ? "standard" : "high",
+        apiKey: session.apiKey || undefined
       })
     });
-  }catch(netErr){
-    var e0 = new Error(netErr && netErr.message ? netErr.message : "Falha de rede");
-    e0.isNetworkError = true;
-    throw e0;
-  }
-  var data = await res.json().catch(function(){ return null; });
-  if(!res.ok){
-    var msg = (data && data.error && data.error.message) ? data.error.message : ("Erro HTTP "+res.status);
-    var status = (data && data.error && data.error.status) || "";
-    var err = new Error(msg);
-    err.httpStatus = res.status;
-    err.isQuotaError = (res.status===429) || status==="RESOURCE_EXHAUSTED" || /quota|rate limit/i.test(msg);
-    err.modeloInexistente = (res.status===404) || status==="NOT_FOUND" ||
-                            /not found|not supported|does not exist/i.test(msg);
-    throw err;
-  }
-  var parts = (((data.candidates||[])[0]||{}).content||{}).parts||[];
-  for(var j=0;j<parts.length;j++){
-    var inline = parts[j].inlineData || parts[j].inline_data;
-    if(inline && inline.data) return "data:"+(inline.mimeType||inline.mime_type||"image/png")+";base64,"+inline.data;
+    if(resServer.ok){
+      var dServer = await resServer.json();
+      if(dServer && dServer.imageUrl) return dServer.imageUrl;
+    }
+  }catch(errServer){}
+
+  // 2. Direct fallback with apiKey if available
+  if(session.apiKey){
+    var res;
+    try{
+      res = await fetch(apiBase()+"/v1beta/models/"+encodeURIComponent(model)+":generateContent", {
+        method:"POST", headers:{"x-goog-api-key":session.apiKey,"Content-Type":"application/json"},
+        body: JSON.stringify({
+          contents:[{role:"user", parts:[{text:prompt}]}],
+          generationConfig:{responseModalities:["IMAGE"]}
+        })
+      });
+    }catch(netErr){
+      var e0 = new Error(netErr && netErr.message ? netErr.message : "Falha de rede");
+      e0.isNetworkError = true;
+      throw e0;
+    }
+    var data = await res.json().catch(function(){ return null; });
+    if(!res.ok){
+      var msg = (data && data.error && data.error.message) ? data.error.message : ("Erro HTTP "+res.status);
+      var status = (data && data.error && data.error.status) || "";
+      var err = new Error(msg);
+      err.httpStatus = res.status;
+      err.isQuotaError = (res.status===429) || status==="RESOURCE_EXHAUSTED" || /quota|rate limit/i.test(msg);
+      err.modeloInexistente = (res.status===404) || status==="NOT_FOUND" ||
+                              /not found|not supported|does not exist/i.test(msg);
+      throw err;
+    }
+    var parts = (((data.candidates||[])[0]||{}).content||{}).parts||[];
+    for(var j=0;j<parts.length;j++){
+      var inline = parts[j].inlineData || parts[j].inline_data;
+      if(inline && inline.data) return "data:"+(inline.mimeType||inline.mime_type||"image/png")+";base64,"+inline.data;
+    }
   }
   var vazio = new Error("O modelo não devolveu imagem.");
   vazio.semImagem = true;
@@ -9919,14 +9998,16 @@ async function boot(){
  }catch(e){}
  loadAdminConfig();
  var profile = await sGet("profile", false);
- if(profile && profile.email && profile.apiKey){
- session.email = normEmail(profile.email); session.name = profile.name; session.apiKey = profile.apiKey;
+ if(profile && profile.email){
+ session.email = normEmail(profile.email); session.name = profile.name || profile.email.split("@")[0]; session.apiKey = profile.apiKey || "";
  session.model = profile.model || DEFAULT_MODEL_FALLBACK;
  session.modelChain = (profile.modelChain && profile.modelChain.length) ? profile.modelChain : [session.model];
  detectModelChain(session.apiKey).then(function(chain){
+ if(chain && chain.length){
  session.modelChain = chain;
  if(chain[0]){ session.model = chain[0]; }
  sSet("profile", {email:session.email,name:session.name,apiKey:session.apiKey,model:session.model,modelChain:chain,updatedAt:Date.now()}, false);
+ }
  });
  await boot2AfterAuth();
  } else {
