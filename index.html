@@ -243,6 +243,22 @@ a{color:var(--arcane-bright);}
 @keyframes bell-blink{0%,100%{opacity:1;filter:drop-shadow(0 0 0 rgba(107,179,158,0));}50%{opacity:.45;filter:drop-shadow(0 0 6px rgba(107,179,158,.9));}}
 .timer-pill{margin:10px 16px 0;padding:8px 12px;border-radius:9px;background:rgba(176,71,58,.14);border:1px solid var(--ember);font-size:12px;color:var(--ember-bright);display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-weight:700;}
 .timer-pill.calm{background:var(--void-3);border-color:var(--line-soft);color:var(--text-lo);}
+/* ---- Widget de duração do turno (cabeçalho do painel do Mestre) ---- */
+.turn-timer{display:flex;align-items:center;gap:6px;padding:4px 6px 4px 8px;border-radius:999px;background:var(--void-3);border:1px solid var(--line);font-family:var(--font-mono);font-size:11.5px;color:var(--text-lo);margin-right:4px;flex-shrink:0;transition:background .3s,border-color .3s,color .3s;}
+.turn-timer .tt-pulse{width:7px;height:7px;border-radius:50%;background:var(--arcane-bright);flex-shrink:0;animation:tt-blink 1.8s ease-in-out infinite;}
+@keyframes tt-blink{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(107,179,158,.5);}50%{opacity:.5;box-shadow:0 0 0 4px rgba(107,179,158,0);}}
+.turn-timer .tt-clock{width:12px;height:12px;flex-shrink:0;opacity:.8;}
+.turn-timer .tt-value{font-weight:700;color:var(--text-hi);min-width:34px;letter-spacing:.02em;}
+.turn-timer .tt-who{color:var(--text-faint);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.turn-timer .tt-btn{background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:12px;padding:2px 4px;line-height:1;border-radius:4px;}
+.turn-timer .tt-btn:hover{color:var(--text-hi);background:var(--void-4);}
+.turn-timer.paused .tt-pulse{animation:none;opacity:.4;background:var(--text-faint);box-shadow:none;}
+.turn-timer.warn{background:rgba(193,154,91,.14);border-color:var(--brass-dim);color:var(--brass-bright);}
+.turn-timer.warn .tt-pulse{background:var(--brass-bright);}
+.turn-timer.alert{background:rgba(176,71,58,.16);border-color:var(--ember);color:var(--ember-bright);}
+.turn-timer.alert .tt-pulse{background:var(--ember-bright);animation:tt-blink 1s ease-in-out infinite;}
+@media (max-width:700px){.turn-timer .tt-who{display:none;}}
+@media (max-width:600px){.turn-timer{padding:4px;} .turn-timer .tt-value{min-width:30px;}}
 #chat-scroll{flex:1;min-height:0;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px;}
 .msg{max-width:82%;display:flex;flex-direction:column;gap:4px;animation:msgin .25s ease;}
 @keyframes msgin{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
@@ -798,6 +814,14 @@ a{color:var(--arcane-bright);}
  </aside>
  <section id="chat-panel" class="panel tab-active">
  <div class="panel-head"><h2 id="chat-panel-title" data-i18n="panel.mestre">O Mestre</h2><div class="spacer"></div>
+ <div class="turn-timer" id="turn-timer" title="Duração do turno atual" data-i18n-title="tt.titulo">
+   <span class="tt-pulse" id="tt-pulse"></span>
+   <svg class="tt-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+   <span class="tt-value" id="tt-value">0:00</span>
+   <span class="tt-who hidden" id="tt-who"></span>
+   <button type="button" class="tt-btn" id="tt-pause" title="Pausar contagem" data-i18n-title="tt.pausar" aria-label="Pausar contagem">⏸</button>
+   <button type="button" class="tt-btn" id="tt-reset" title="Reiniciar contagem" data-i18n-title="tt.reiniciar" aria-label="Reiniciar contagem">↺</button>
+ </div>
  <button class="icon-btn" id="chat-tips" title="Comandos rápidos" aria-label="Comandos rápidos">
  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2.05V17h6v-.25c0-.85.4-1.55 1-2.05A7 7 0 0 0 12 2Z"/></svg>
  </button>
@@ -1541,6 +1565,88 @@ function fmtClock(ms){
  return m+":"+(s<10?"0":"")+s;
 }
 function initialsOf(name){ return (name||"?").trim().charAt(0).toUpperCase(); }
+
+/* ---------------------------------------------------------
+   WIDGET DE DURAÇÃO DO TURNO
+   Cronômetro visual no cabeçalho do painel do Mestre. Reinicia
+   sozinho a cada evento que caracteriza um "novo turno": ação do
+   jogador enviada, resposta do Mestre recebida, ou passagem de vez
+   em aventuras de grupo. Puramente de interface — não é persistido
+   nem sincronizado, então cada jogador vê a contagem do seu próprio
+   navegador (reflete o tempo real decorrido para ele).
+   --------------------------------------------------------- */
+var TT_AVISO_MS = 2*60*1000;   // aviso âmbar após 2 minutos
+var TT_ALERTA_MS = 5*60*1000;  // alerta coral/ember após 5 minutos
+var turnTimerStartTs = null;
+var turnTimerPausedMs = 0;      // tempo total já acumulado em pausas
+var turnTimerPauseStarted = null; // ts de quando a pausa atual começou (null = rodando)
+
+function fmtClockLongo(ms){
+  if(ms<0) ms=0;
+  var s = Math.floor(ms/1000);
+  var h = Math.floor(s/3600); s -= h*3600;
+  var m = Math.floor(s/60); s -= m*60;
+  if(h>0) return h+":"+(m<10?"0":"")+m+":"+(s<10?"0":"")+s;
+  return m+":"+(s<10?"0":"")+s;
+}
+function iniciarTurnTimer(){
+  turnTimerStartTs = Date.now();
+  turnTimerPausedMs = 0;
+  turnTimerPauseStarted = null;
+  atualizarBotaoPausaTimer();
+  renderTurnTimer();
+}
+function alternarPausaTurnTimer(){
+  if(turnTimerStartTs===null) return;
+  if(turnTimerPauseStarted){
+    turnTimerPausedMs += Date.now()-turnTimerPauseStarted;
+    turnTimerPauseStarted = null;
+  } else {
+    turnTimerPauseStarted = Date.now();
+  }
+  atualizarBotaoPausaTimer();
+  renderTurnTimer();
+}
+function atualizarBotaoPausaTimer(){
+  var btn = el("tt-pause");
+  if(!btn) return;
+  var pausado = !!turnTimerPauseStarted;
+  btn.textContent = pausado ? "▶" : "⏸";
+  var rotulo = t(pausado ? "tt.retomar" : "tt.pausar");
+  btn.title = rotulo; btn.setAttribute("aria-label", rotulo);
+  btn.setAttribute("data-i18n-title", pausado ? "tt.retomar" : "tt.pausar");
+}
+function renderTurnTimer(){
+  var box = el("turn-timer");
+  if(!box) return;
+  if(turnTimerStartTs===null){
+    el("tt-value").textContent = "0:00";
+    box.className = "turn-timer";
+    return;
+  }
+  var agora = turnTimerPauseStarted || Date.now();
+  var decorrido = Math.max(0, agora - turnTimerStartTs - turnTimerPausedMs);
+  el("tt-value").textContent = fmtClockLongo(decorrido);
+  var nivel = decorrido>=TT_ALERTA_MS ? " alert" : (decorrido>=TT_AVISO_MS ? " warn" : "");
+  box.className = "turn-timer" + nivel + (turnTimerPauseStarted ? " paused" : "");
+  var who = el("tt-who");
+  if(who){
+    if(currentAdv && currentAdv.mode==="grupo" && currentTurno && currentTurno.email){
+      var meu = normEmail(currentTurno.email)===session.email;
+      who.textContent = t("tt.vezDe")+" "+(meu ? t("tt.voce") : nomeDoMembro(currentTurno.email));
+      who.classList.remove("hidden");
+    } else {
+      who.classList.add("hidden");
+    }
+  }
+}
+(function(){
+  var btn = el("tt-pause");
+  if(btn) btn.addEventListener("click", alternarPausaTurnTimer);
+  var rst = el("tt-reset");
+  if(rst) rst.addEventListener("click", iniciarTurnTimer);
+})();
+setInterval(function(){ if(view==="game" && gameMode==="play") renderTurnTimer(); }, 1000);
 
 /* =========================================================
  GEMINI API
@@ -2699,6 +2805,7 @@ async function enterPlay(advId, preloaded){
  if(bloq){ alert(bloq); return; }
  currentAdvId = advId; gameMode="play";
  sessionStartTs = Date.now();
+ iniciarTurnTimer(); // nova aventura/cena aberta: cronômetro do turno começa do zero
  var adv = preloaded || await sGet("adv:"+advId, true);
  if(!adv){ enterHub(); return; }
  currentAdv = adv;
@@ -2732,7 +2839,11 @@ function ligarListenersDaAventura(){
  renderPlayChat(lista);
  lastSeenMsgCount = lista.length;
  });
- fsListen("turno:"+base, function(t){ currentTurno = t; renderVezPill(); });
+ fsListen("turno:"+base, function(t){
+   var mudouDeVez = t && t.email && (!currentTurno || !currentTurno.email || normEmail(currentTurno.email)!==normEmail(t.email));
+   currentTurno = t; renderVezPill();
+   if(mudouDeVez) iniciarTurnTimer(); // passagem de vez em grupo: novo turno começa a ser contado
+ });
  fsListen("check:"+base, function(chk){
  if(view==="game" && gameMode==="play") renderSkillCheck(chk);
  });
@@ -2875,6 +2986,7 @@ function renderVezPill(){
   var box = el("turno-pill");
   var bell = el("turn-bell");
   if(!box) return;
+  renderTurnTimer(); // mantém o rótulo "vez de <nome>" do widget sempre em dia
   if(!currentAdv || currentAdv.mode!=="grupo" || !currentTurno || !currentTurno.email){
     box.classList.add("hidden");
     if(bell){ bell.classList.add("hidden"); bell.classList.remove("minha-vez"); }
@@ -3404,6 +3516,7 @@ async function sendSceneMessage(text, opts){
  }
 
  renderPlayChat(msgs); lastSeenMsgCount=msgs.length;
+ iniciarTurnTimer(); // ação do jogador enviada: novo turno começa a ser contado
  loading=true; updateSendUI(); showTyping(true);
  try{
  await runGmTurn(advId, sceneId);
@@ -3464,6 +3577,7 @@ async function runGmTurn(advId, sceneId){
  msgs = await appendSceneMessages(advId, sceneId, [{role:"model", text:extracted.clean||"(o mestre ficou em silêncio…)", ts:Date.now(), display:true}]);
  lastSeenMsgCount = msgs.length;
  renderPlayChat(msgs);
+ iniciarTurnTimer(); // nova resposta do Mestre: novo turno começa a ser contado
 
  if(data){
  if(data.xpConcedido && Array.isArray(data.xpConcedido) && data.xpConcedido.length){
@@ -3472,13 +3586,19 @@ async function runGmTurn(advId, sceneId){
  }
  if(adv.mode==="grupo"){
  var vez = data.vezDe ? normEmail(data.vezDe) : null;
- await sSet("turno:"+advId+":"+sceneId, vez ? {email:vez, desde:Date.now()} : null, true);
+ // Antes gravava null quando ninguém tinha a vez definida, o que faz o
+ // Firestore tentar um DELETE do documento — se as regras não permitirem
+ // delete (só update/create), a escrita falha em silêncio com "Missing or
+ // insufficient permissions". Gravar um marcador vazio é sempre um UPDATE
+ // comum, e ehMinhaVez()/renderVezPill() já tratam a ausência de .email
+ // exatamente como tratavam null.
+ await sSet("turno:"+advId+":"+sceneId, vez ? {email:vez, desde:Date.now()} : {vazio:true}, true);
  }
  var checkPedido = data.testeSolicitado || null;
  if(!checkPedido || !((checkPedido.pericias||[]).length || checkPedido.formula)){
    checkPedido = inferCheckFromText(extracted.clean, character) || null;
  }
- await sSet("check:"+advId+":"+sceneId, checkPedido, true);
+ await sSet("check:"+advId+":"+sceneId, checkPedido || {vazio:true}, true);
 /* O XP vinha sendo aplicado apenas dentro do bloco de fichas: quando o Mestre
    mandava "xpConcedido" sem repetir a ficha, o ganho era descartado em
    silêncio. Garantimos que toda ficha citada em xpConcedido seja processada,
@@ -6232,11 +6352,11 @@ async function consumirCheckAtual(){
       if(vivo){
         vivo.jaRolaram = (vivo.jaRolaram||[]).concat([session.email]);
         var faltam = alvos.filter(function(em){ return vivo.jaRolaram.indexOf(em)===-1; });
-        await sSet(chave, faltam.length ? vivo : null, true);
+        await sSet(chave, faltam.length ? vivo : {vazio:true}, true);
         return;
       }
     }
-    await sSet(chave, null, true);
+    await sSet(chave, {vazio:true}, true);
   }catch(e){}
 }
 
@@ -6640,6 +6760,12 @@ var I18N_DICT = {
     "stats.tempo":"Tempo de sessão",
     "stats.titulo":"Dados & Estatísticas",
     "tips.titulo":"Comandos rápidos",
+    "tt.titulo":"Duração do turno atual",
+    "tt.pausar":"Pausar contagem",
+    "tt.retomar":"Retomar contagem",
+    "tt.reiniciar":"Reiniciar contagem",
+    "tt.vezDe":"Vez de",
+    "tt.voce":"você",
     "auth.entrarTitulo":"Entrar",
     "auth.voltaLede":"Bem-vindo de volta! Digite sua senha para continuar.",
     "auth.criarTitulo":"Criar conta",
@@ -6669,6 +6795,12 @@ var I18N_DICT = {
     "stats.tempo":"Session time",
     "stats.titulo":"Data & Statistics",
     "tips.titulo":"Quick commands",
+    "tt.titulo":"Current turn duration",
+    "tt.pausar":"Pause timer",
+    "tt.retomar":"Resume timer",
+    "tt.reiniciar":"Reset timer",
+    "tt.vezDe":"Turn:",
+    "tt.voce":"you",
     "auth.entrarTitulo":"Log in",
     "auth.voltaLede":"Welcome back! Enter your password to continue.",
     "auth.criarTitulo":"Create account",
@@ -6698,6 +6830,12 @@ var I18N_DICT = {
     "stats.tempo":"Tiempo de sesión",
     "stats.titulo":"Datos y Estadísticas",
     "tips.titulo":"Comandos rápidos",
+    "tt.titulo":"Duración del turno actual",
+    "tt.pausar":"Pausar cronómetro",
+    "tt.retomar":"Reanudar cronómetro",
+    "tt.reiniciar":"Reiniciar cronómetro",
+    "tt.vezDe":"Turno de",
+    "tt.voce":"tú",
     "auth.entrarTitulo":"Iniciar sesión",
     "auth.voltaLede":"¡Bienvenido de nuevo! Escribe tu contraseña para continuar.",
     "auth.criarTitulo":"Crear cuenta",
@@ -6723,6 +6861,12 @@ function aplicarIdioma(lang){
     var key = elm.getAttribute("data-i18n-placeholder");
     if(dict[key]) elm.setAttribute("placeholder", dict[key]);
   });
+  document.querySelectorAll("[data-i18n-title]").forEach(function(elm){
+    var key = elm.getAttribute("data-i18n-title");
+    if(dict[key]) elm.setAttribute("title", dict[key]);
+  });
+  atualizarBotaoPausaTimer(); // rótulo pausar/retomar depende do idioma e do estado atual
+  renderTurnTimer();          // "Vez de <nome>" também é traduzido
   document.documentElement.setAttribute("lang", lang==="pt"?"pt-BR":lang);
   ["lang-select-auth","lang-select-hub","lang-select-game"].forEach(function(id){
     var s = document.getElementById(id);
