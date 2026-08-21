@@ -1565,9 +1565,22 @@ function friendlyApiError(err){
  return "Não consegui falar com o Gemini: "+m;
 }
 
+/* Sem timeout, um fetch que trava (rede instável, extensão do navegador
+   bloqueando a chamada, proxy que engasga) nunca resolve nem rejeita — e como
+   o indicador "digitando..." só some quando esse await termina, o Mestre
+   fica preso para sempre, sem erro nenhum. Este wrapper garante que toda
+   chamada à API sempre termina, com sucesso ou com um erro tratável. */
+function fetchComTimeout(url, options, timeoutMs){
+  var ctrl = (typeof AbortController!=="undefined") ? new AbortController() : null;
+  var opts = options || {};
+  if(ctrl) opts.signal = ctrl.signal;
+  var timer = ctrl ? setTimeout(function(){ ctrl.abort(); }, timeoutMs) : null;
+  return fetch(url, opts).finally(function(){ if(timer) clearTimeout(timer); });
+}
+
 async function detectModelChain(apiKey){
  try{
- var res = await fetch(apiBase()+"/v1beta/models", { headers:{"x-goog-api-key":apiKey} });
+ var res = await fetchComTimeout(apiBase()+"/v1beta/models", { headers:{"x-goog-api-key":apiKey} }, 15000);
  if(!res.ok) return [DEFAULT_MODEL_FALLBACK];
  var data = await res.json();
  var models = (data.models||[]).filter(function(m){
@@ -1612,13 +1625,15 @@ async function detectModelChain(apiKey){
 async function callGeminiOnce(systemText, contents, model){
  var res;
  try{
- res = await fetch(apiBase()+"/v1beta/models/"+encodeURIComponent(model)+":generateContent", {
+ res = await fetchComTimeout(apiBase()+"/v1beta/models/"+encodeURIComponent(model)+":generateContent", {
  method:"POST", headers:{"x-goog-api-key":session.apiKey, "Content-Type":"application/json"},
  body: JSON.stringify({ systemInstruction:{parts:[{text:systemText}]}, contents:contents, generationConfig:{maxOutputTokens:8192} })
- });
+ }, 45000);
  }catch(netErr){
- // "Failed to fetch": queda de rede, wifi trocando, DNS. É passageiro.
- var e0 = new Error(netErr && netErr.message ? netErr.message : "Falha de rede");
+ // "Failed to fetch" (queda de rede, wifi trocando, DNS) ou abort por timeout
+ // (a chamada travou sem nunca responder): ambos são passageiros e entram
+ // no mesmo fluxo de nova tentativa / troca de modelo.
+ var e0 = new Error((netErr && netErr.name==="AbortError") ? "Tempo de resposta esgotado." : (netErr && netErr.message ? netErr.message : "Falha de rede"));
  e0.isNetworkError = true;
  throw e0;
  }
