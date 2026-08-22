@@ -238,6 +238,18 @@ a{color:var(--arcane-bright);}
 .pdf-banner{margin:0 16px 0;padding:8px 12px;border-radius:8px;background:var(--void-3);border:1px solid var(--line-soft);font-size:11.5px;color:var(--text-faint);display:flex;align-items:center;gap:8px;}
 .pdf-banner a{color:var(--arcane-bright);text-decoration:none;font-weight:600;}
 .turno-pill{font-size:11px;padding:5px 11px;border-radius:999px;background:var(--void-3);border:1px solid var(--line);color:var(--text-faint);}
+.mission-bar{padding:8px 14px;margin:0 14px 8px;background:var(--void-2);border:1px solid var(--line);border-left:3px solid var(--brass-dim);border-radius:9px;}
+.mission-row{display:flex;align-items:flex-start;gap:8px;}
+.mission-glyph{font-size:14px;line-height:1.4;flex-shrink:0;}
+.mission-text{min-width:0;display:flex;flex-direction:column;gap:1px;flex:1;}
+.mission-text b{font-size:12.5px;color:var(--text-hi);font-weight:600;}
+.mission-text span{font-size:11px;color:var(--text-lo);}
+.mission-text span:empty{display:none;}
+.mission-toggle{background:none;border:none;color:var(--text-lo);font-size:13px;cursor:pointer;padding:0 4px;flex-shrink:0;transition:transform .15s;}
+.mission-toggle.open{transform:rotate(180deg);}
+.mission-ganchos{list-style:none;margin:8px 0 0;padding:8px 0 0;border-top:1px dashed var(--line-soft);font-size:11px;color:var(--text-lo);display:flex;flex-direction:column;gap:5px;}
+.mission-ganchos li{position:relative;padding-left:14px;}
+.mission-ganchos li::before{content:"·";position:absolute;left:2px;color:var(--brass-dim);}
 .turno-pill.minha{background:rgba(79,143,124,.18);border-color:var(--arcane);color:var(--arcane-bright);font-weight:700;}
 #turn-bell.minha-vez{color:var(--arcane-bright);animation:bell-blink 1.4s ease-in-out infinite;}
 @keyframes bell-blink{0%,100%{opacity:1;filter:drop-shadow(0 0 0 rgba(107,179,158,0));}50%{opacity:.45;filter:drop-shadow(0 0 6px rgba(107,179,158,.9));}}
@@ -392,6 +404,8 @@ a{color:var(--arcane-bright);}
 .adv-card .ac-info{flex:1;min-width:0;}
 .adv-card .ac-info b{display:block;font-size:13.5px;color:var(--text-hi);}
 .adv-card .ac-info span{font-size:11.5px;color:var(--text-lo);}
+.adv-card .ac-info .ac-objetivo{display:block;font-size:11px;color:var(--brass-dim);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.adv-card .ac-info .ac-travada{display:block;font-size:11px;color:var(--ember-bright);margin-top:2px;}
 .status-badge{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:4px 9px;border-radius:999px;flex-shrink:0;}
 .status-badge.lobby{background:rgba(193,154,91,.18);color:var(--brass-bright);}
 .status-badge.ativa{background:rgba(79,143,124,.2);color:var(--arcane-bright);}
@@ -786,6 +800,17 @@ a{color:var(--arcane-bright);}
  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2.05V17h6v-.25c0-.85.4-1.55 1-2.05A7 7 0 0 0 12 2Z"/></svg>
  </button>
  </div>
+ <div id="mission-bar" class="mission-bar hidden">
+   <div class="mission-row" id="mission-row">
+     <span class="mission-glyph">🎯</span>
+     <div class="mission-text">
+       <b id="mission-objetivo"></b>
+       <span id="mission-proximo"></span>
+     </div>
+     <button type="button" class="mission-toggle hidden" id="mission-toggle" aria-label="Ver ganchos ativos">▾</button>
+   </div>
+   <ul id="mission-ganchos" class="mission-ganchos hidden"></ul>
+ </div>
  <div class="turno-pill hidden" id="turno-pill"></div>
  <div id="timer-pill" class="timer-pill hidden">
 </div>
@@ -826,6 +851,8 @@ a{color:var(--arcane-bright);}
    <div class="ss-grid">
      <div class="ss-box"><div class="ss-v" id="ss-turnos">0</div><div class="ss-l" data-i18n="stats.turnos">Total de turnos</div></div>
      <div class="ss-box"><div class="ss-v" id="ss-inimigos">0</div><div class="ss-l" data-i18n="stats.inimigos">Inimigos derrotados</div></div>
+     <div class="ss-box"><div class="ss-v" id="ss-criticos">0</div><div class="ss-l" data-i18n="stats.criticos">Críticos (20 natural)</div></div>
+     <div class="ss-box"><div class="ss-v" id="ss-falhas">0</div><div class="ss-l" data-i18n="stats.falhas">Falhas críticas (1 natural)</div></div>
      <div class="ss-box"><div class="ss-v" id="ss-tempo">0min</div><div class="ss-l" data-i18n="stats.tempo">Tempo de sessão</div></div>
    </div>
  </div>
@@ -1366,7 +1393,7 @@ var partyCache = {}; // email -> character
 function isSyncedKey(key){
  // TODA chave compartilhada precisa estar aqui, senao o dado fica preso no
  // navegador de quem criou e mais ninguem enxerga.
- return /^(pub:|character:|adv:|member-adv:|scene-msgs:|pending-action:|check:|admin-config|event:|events-index|market:|market-index|market-treasury|crafted:|producao:|ledger:|forge-chat:|turno:|iteminfo:|producao:)/.test(key);
+ return /^(pub:|character:|adv:|member-adv:|scene-msgs:|pending-action:|check:|admin-config|event:|events-index|event-log:|market:|market-index|market-treasury|crafted:|producao:|ledger:|forge-chat:|turno:|iteminfo:|producao:)/.test(key);
 }
 /* Values are stored wrapped as {__v:rev, __t:ts, d:data} so a stale or failed
  remote write can never overwrite newer local data on screen. */
@@ -1948,11 +1975,13 @@ FICHA_START+"\n{ ...JSON... }\n"+FICHA_END+"\n\n" +
 ' "itensPerdidos": [{"email": string, "itens": [string]}],\n'+
 ' "magiasAprendidas": [{"email": string, "magias": [string]}],\n'+
 ' "magiasPerdidas": [{"email": string, "magias": [string]}],\n'+
-' "periciasTreinadas": [{"email": string, "pericias": [{"nome": string, "posto": "treinado"|"especialista"|"mestre"|"lendario"}]}]\n'+
+' "periciasTreinadas": [{"email": string, "pericias": [{"nome": string, "posto": "treinado"|"especialista"|"mestre"|"lendario"}]}],\n'+
+' "eventos": [{"tipo": "COMBATE_FINALIZADO", "inimigosDerrotados": number}],\n'+
+' "estadoNarrativo": {"objetivo": string|null, "proximoPasso": string|null, "ganchosAtivos": [string]}\n'+
 "}\n\n" +
 (isGroup
  ? "Regras críticas: 1) \"cenas\" deve sempre listar TODOS os jogadores confirmados da aventura, cada um em exatamente uma cena — nunca esqueça ninguém. 2) \"fichas\" deve sempre incluir a ficha atual de TODOS os membros da cena ativa (mesmo sem mudanças), com \"experiencia\" refletindo o total acumulado. "
- : "Regras críticas: 1) Não existem cenas nem outros jogadores nesta aventura. 2) \"fichas\" deve conter a ficha atual do jogador (mesmo sem mudanças), com \"experiencia\" refletindo o total acumulado. ") + "3) NUNCA altere a identidade de um personagem: nome, ancestralidade, linhagem, antecedente e classe são definidos pelo jogador na criação e devem ser repetidos exatamente como estão. Se você não souber o valor de um campo, repita o valor anterior em vez de inventar ou deixar em branco. Nunca reduza o nível nem a experiência de um personagem. 4) INVENTÁRIO, MAGIAS E PERÍCIAS: o aplicativo controla as listas \"equipamento\", \"magias\" e \"pericias\" — o que você escrever nesses arrays é IGNORADO. Os modificadores de perícia são calculados automaticamente pelo aplicativo (nível + proficiência + atributo); NUNCA calcule, informe ou corrija modificadores, e nunca repita a ficha no chat. Para treinar o personagem numa perícia nova ou elevar seu posto, use \"periciasTreinadas\". Para dar ou tirar um item, ou ensinar/remover uma magia, use exclusivamente \"itensGanhos\", \"itensPerdidos\", \"magiasAprendidas\" e \"magiasPerdidas\", listando apenas o que mudou NESTE turno (arrays vazios quando nada mudou). Nunca remova algo do inventário do jogador sem um motivo narrado explicitamente na cena. 5) \"xpConcedido\" lista apenas o XP ganho NESTE turno (array vazio quando não houve ganho). 6) O bloco deve conter apenas JSON válido, uma única vez, sempre ao final.";
+ : "Regras críticas: 1) Não existem cenas nem outros jogadores nesta aventura. 2) \"fichas\" deve conter a ficha atual do jogador (mesmo sem mudanças), com \"experiencia\" refletindo o total acumulado. ") + "3) NUNCA altere a identidade de um personagem: nome, ancestralidade, linhagem, antecedente e classe são definidos pelo jogador na criação e devem ser repetidos exatamente como estão. Se você não souber o valor de um campo, repita o valor anterior em vez de inventar ou deixar em branco. Nunca reduza o nível nem a experiência de um personagem. 4) INVENTÁRIO, MAGIAS E PERÍCIAS: o aplicativo controla as listas \"equipamento\", \"magias\" e \"pericias\" — o que você escrever nesses arrays é IGNORADO. Os modificadores de perícia são calculados automaticamente pelo aplicativo (nível + proficiência + atributo); NUNCA calcule, informe ou corrija modificadores, e nunca repita a ficha no chat. Para treinar o personagem numa perícia nova ou elevar seu posto, use \"periciasTreinadas\". Para dar ou tirar um item, ou ensinar/remover uma magia, use exclusivamente \"itensGanhos\", \"itensPerdidos\", \"magiasAprendidas\" e \"magiasPerdidas\", listando apenas o que mudou NESTE turno (arrays vazios quando nada mudou). Nunca remova algo do inventário do jogador sem um motivo narrado explicitamente na cena. 5) \"xpConcedido\" lista apenas o XP ganho NESTE turno (array vazio quando não houve ganho). 6) \"eventos\": toda vez que um combate desta cena terminar NESTE turno (todos os inimigos derrotados, fugiram ou se renderam), inclua um item {\"tipo\":\"COMBATE_FINALIZADO\",\"inimigosDerrotados\":N} com a contagem exata de inimigos derrotados nesse combate (0 se ninguém morreu, ex.: fuga ou rendição). Não repita esse evento em turnos seguintes do mesmo combate, nem invente combates que não aconteceram. Nunca inclua eventos de outro tipo — críticos e falhas são controlados pelo próprio aplicativo, não pela narrativa. Array vazio quando não houve conclusão de combate neste turno. 7) \"estadoNarrativo\": mantenha sempre atualizado o objetivo atual da aventura (\"objetivo\", uma frase curta, ex.: \"Descobrir quem sabotou as caravanas\"), o próximo passo sugerido (\"proximoPasso\", ex.: \"Falar com o ferreiro sobre as marcas na ferradura\") e uma lista curta de ganchos de história ainda em aberto (\"ganchosAtivos\", no máximo 5 frases curtas). Repita os mesmos valores em turnos onde nada mudou; atualize \"objetivo\" só quando a missão principal genuinamente mudar, e \"proximoPasso\" a cada vez que a situação avançar. Isso é usado pelo aplicativo para lembrar o jogador onde parou, então nunca deixe em branco depois do primeiro turno da aventura. 8) O bloco deve conter apenas JSON válido, uma única vez, sempre ao final.";
 }
 
 function buildCreationSystemPrompt(){
@@ -2388,6 +2417,35 @@ el("hub-new-solo").addEventListener("click", async function(){
 });
 el("hub-new-group").addEventListener("click", function(){ openNewAdvModal(); });
 
+/* Fase 3: varre as aventuras em grupo/ativas do jogador em busca de
+   "pending-action" cujo prazo já estourou há um bom tempo — sinal de que
+   ninguém com a cena aberta esteve online para disparar a resolução
+   automática (limitação descrita na seção 6 da auditoria: sem um
+   backend agendado, alguém precisa abrir a cena para o relógio avançar).
+   Isto só LÊ dados e mostra um aviso; a resolução em si continua
+   acontecendo com segurança dentro de maybeResolveTimeout(), já dentro
+   do contexto correto da cena/personagem. */
+var STUCK_GRACE_MS = 3*60*1000; // folga além do próprio prazo de 7min, pra não avisar cedo demais
+async function detectarAventurasTravadas(advsAtivas){
+  var resultado = {};
+  var candidatas = (advsAtivas||[]).filter(function(a){ return a.mode==="grupo" && a.status==="ativa"; });
+  await Promise.all(candidatas.map(async function(adv){
+    try{
+      var sceneIds = (adv.scenes && adv.scenes.length) ? adv.scenes.map(function(s){ return s.id; }) : ["principal"];
+      for(var i=0;i<sceneIds.length;i++){
+        var pending = await sGet("pending-action:"+adv.id+":"+sceneIds[i], true);
+        if(!pending || !pending.requestedAt) continue;
+        var faltam = (pending.expectedEmails||[]).filter(function(em){ return (pending.respondedEmails||[]).indexOf(em)===-1; });
+        if(faltam.length && (Date.now()-pending.requestedAt) > (ACTION_WINDOW_MS+STUCK_GRACE_MS)){
+          resultado[adv.id] = true;
+          break;
+        }
+      }
+    }catch(e){ /* leitura best-effort — nunca bloqueia o hub */ }
+  }));
+  return resultado;
+}
+
 async function refreshHubAdventures(){
  var ids = await sGet("member-adv:"+session.email, true) || [];
  var list = [];
@@ -2408,13 +2466,25 @@ async function refreshHubAdventures(){
  list = emCurso.concat(arquivoLimitado ? concluidas.slice(0, LIMITE_ARQUIVO_GRATUITO) : concluidas);
  var box = el("hub-adv-list");
  if(!list.length){ box.innerHTML = '<p class="empty-hint">Você ainda não tem aventuras. Crie uma acima.</p>'; return; }
+ // Fase 3: aventuras em grupo "ativas" podem ficar travadas esperando a
+ // resposta de alguém, se ninguém tiver a cena aberta quando o prazo
+ // vence (a resolução automática só roda dentro da própria cena — ver
+ // maybeResolveTimeout). Aqui só detectamos e avisamos no hub, sem
+ // tentar resolver nada por fora do contexto correto da cena.
+ var travadas = await detectarAventurasTravadas(emCurso);
  box.innerHTML = list.map(function(adv){
  var mine = (adv.members||[]).filter(function(m){ return m.email===session.email; })[0];
  var isPendingInvite = adv.status==="lobby" && mine && mine.status==="convidado";
  var badgeCls = isPendingInvite ? "convite" : adv.status;
  var badgeText = isPendingInvite ? "Convite" : (adv.status==="lobby"?"Aguardando":adv.status==="ativa"?"Em andamento":adv.status==="pausada"?"Pausada":"Concluída");
  var icon = adv.mode==="grupo" ? "👥" : "🗡️";
- return '<div class="adv-card" data-adv="'+adv.id+'"><div class="ac-icon">'+icon+'</div><div class="ac-info"><b>'+esc(adv.name)+'</b><span>'+(adv.mode==="grupo"?"Em grupo":"Solo")+' · anfitrião: '+esc(adv.hostName||"")+'</span></div><span class="status-badge '+badgeCls+'">'+badgeText+'</span></div>';
+ var meta = (adv.mode==="grupo"?"Em grupo":"Solo")+' · anfitrião: '+esc(adv.hostName||"");
+ // Fase 2: mostra o objetivo atual no card, quando já existe — ajuda o
+ // jogador a lembrar "onde parei" antes mesmo de abrir a aventura.
+ var objetivoLine = (adv.estadoNarrativo && adv.estadoNarrativo.objetivo)
+   ? '<span class="ac-objetivo">🎯 '+esc(adv.estadoNarrativo.objetivo)+'</span>' : "";
+ var travadaLine = travadas[adv.id] ? '<span class="ac-travada">⏱ esperando resposta há um tempo — abra para o Mestre continuar</span>' : "";
+ return '<div class="adv-card" data-adv="'+adv.id+'"><div class="ac-icon">'+icon+'</div><div class="ac-info"><b>'+esc(adv.name)+'</b><span>'+meta+'</span>'+objetivoLine+travadaLine+'</div><span class="status-badge '+badgeCls+'">'+badgeText+'</span></div>';
  }).join("");
  box.querySelectorAll("[data-adv]").forEach(function(elm){
  elm.addEventListener("click", async function(){
@@ -2579,6 +2649,7 @@ async function enterPlay(advId, preloaded){
  if(bloq){ alert(bloq); return; }
  currentAdvId = advId; gameMode="play";
  sessionStartTs = Date.now();
+ await inicializarEventLogSessao(advId);
  var adv = preloaded || await sGet("adv:"+advId, true);
  if(!adv){ enterHub(); return; }
  currentAdv = adv;
@@ -2597,8 +2668,36 @@ async function enterPlay(advId, preloaded){
  updateSendUI();
  el("chat-form").classList.toggle("hidden", adv.status!=="ativa");
  updatePlayControls(adv);
+ atualizarMissaoAtual(adv);
  await refreshPlay(true);
+ mostrarBoasVindasDeVolta(adv);
  ligarListenersDaAventura();
+}
+/* Fase 2: "resumo da última sessão" — só a primeira vez que esta aventura
+   é aberta nesta aba, e só quando já existe objetivo/gancho guardado (ou
+   seja, não é a primeira sessão da aventura). Reaproveita o mesmo padrão
+   visual dos outros toasts (showXpToast etc.), sem exigir nenhuma tela
+   nova. */
+var missaoBoasVindasMostradas = {};
+function mostrarBoasVindasDeVolta(adv){
+  if(!adv || !adv.id || missaoBoasVindasMostradas[adv.id]) return;
+  missaoBoasVindasMostradas[adv.id] = true;
+  var en = adv.estadoNarrativo;
+  if(!en || (!en.objetivo && !en.proximoPasso)) return;
+  // só mostra "bem-vindo de volta" se a última atualização não foi agora
+  // mesmo (evita o toast aparecer logo depois do próprio primeiro turno)
+  if(en.atualizadoEm && (Date.now()-en.atualizadoEm) < 15000) return;
+  var scroll = el("chat-scroll");
+  if(!scroll) return;
+  var partes = ["Bem-vindo de volta!"];
+  if(en.objetivo) partes.push("Objetivo: "+en.objetivo);
+  if(en.proximoPasso) partes.push("Próximo passo: "+en.proximoPasso);
+  var d = document.createElement("div");
+  d.className = "xp-toast welcome-toast";
+  d.innerHTML = "🕯️ " + partes.map(esc).join(" · ");
+  scroll.appendChild(d);
+  requestAnimationFrame(function(){ scroll.scrollTop = scroll.scrollHeight; });
+  setTimeout(function(){ if(d.parentNode) d.remove(); }, 14000);
 }
 
 function ligarListenersDaAventura(){
@@ -2897,18 +2996,27 @@ function hideNewMsgPill(){
 }
 
 /* ---- Painel de estatísticas da sessão ----
-   Contadores globais, derivados do próprio histórico de mensagens da cena —
-   não exigem nenhum novo campo na ficha nem mudança no formato salvo pela IA.
-   "Inimigos derrotados" é uma estimativa por palavras-chave nas falas do
-   Mestre (derrotou, morto, abatido, vencido em combate…), então pode não ser
-   perfeita, mas dá uma noção real de progresso sem depender de um contrato
-   novo com o modelo. */
+   Contadores globais. Até a Fase 0 eram todos derivados por heurística de
+   palavras-chave no texto do Mestre ("derrotou", "morto", "abatido"...),
+   o que a auditoria apontou como não confiável (falso positivo/negativo
+   dependendo da frase usada).
+   Fase 1: os contadores passam a vir, sempre que possível, de eventos
+   ESTRUTURADOS — nunca do texto livre:
+     • críticos e falhas críticas em testes de perícia: o app já rola o
+       d20 e sabe o valor exato (1 ou 20) no momento da rolagem — não
+       depende da IA narrar "foi um crítico".
+     • inimigos derrotados: continua exigindo julgamento narrativo (só o
+       Mestre sabe se o combate terminou), mas agora é reportado num
+       campo JSON estruturado ("eventos") em vez de ser adivinhado a
+       partir da prosa.
+   O regex antigo continua existindo só como fallback para aventuras/
+   turnos antigos que não têm nenhum evento estruturado ainda. */
 var ultimosMsgsParaStats = [];
 var RX_INIMIGO_DERROTADO = /derrot(ou|ado|ados|a)|abat(eu|ido|idos)|mort[oa]s?\s+(em|no|na)|venceu\s+(o|a|os|as)|caiu\s+(morto|morta)|elimin(ou|ado|ados)/i;
 function contarTurnos(msgs){
   return (msgs||[]).filter(function(m){ return m.role==="user" && m.kind!=="system"; }).length;
 }
-function contarInimigosDerrotados(msgs){
+function contarInimigosDerrotadosRegex(msgs){
   var n = 0;
   (msgs||[]).forEach(function(m){
     if(m.role!=="model" || !m.text) return;
@@ -2917,6 +3025,104 @@ function contarInimigosDerrotados(msgs){
   });
   return n;
 }
+
+/* =========================================================
+ EVENT LOG ESTRUTURADO (Fase 1)
+ Um documento por aventura, guardando contadores agregados e uma lista
+ curta (até EVENT_LOG_MAX) dos últimos eventos — o suficiente para
+ estatísticas confiáveis e para uma futura linha do tempo, sem crescer
+ sem limite. Isto é o primeiro degrau do "Event Log" completo descrito
+ no roadmap (seção 22 da auditoria); uma versão futura pode expandir
+ para um registro por evento em vez de contadores agregados.
+ ========================================================= */
+var EVENT_LOG_MAX = 200;
+var TIPOS_EVENTO_VALIDOS = {
+  "COMBATE_FINALIZADO": true,
+  "TESTE_CRITICO": true,
+  "TESTE_FALHA_CRITICA": true
+};
+function eventLogVazio(){
+  return { inimigosDerrotados:0, combatesFinalizados:0, criticos:0, falhasCriticas:0, eventos:[], updatedAt:Date.now() };
+}
+async function carregarEventLog(advId){
+  var log = await sGet("event-log:"+advId, true);
+  return (log && typeof log==="object") ? log : eventLogVazio();
+}
+/* events: array de {tipo, ...payload}. Só tipos conhecidos são aceitos —
+   o motor VALIDA o que a IA (ou a rolagem local) declara, não confia cegamente. */
+async function registrarEventos(advId, sceneId, events, origem){
+  var validos = (events||[]).filter(function(e){ return e && TIPOS_EVENTO_VALIDOS[e.tipo]; });
+  if(!validos.length) return null;
+  var log = await carregarEventLog(advId);
+  validos.forEach(function(e){
+    var entry = { ts:Date.now(), sceneId:sceneId||null, tipo:e.tipo, origem:origem||"ia" };
+    if(e.tipo==="COMBATE_FINALIZADO"){
+      var n = Math.max(0, Math.min(50, parseInt(e.inimigosDerrotados,10)||0)); // sanidade: nunca negativo nem absurdo
+      log.inimigosDerrotados += n;
+      log.combatesFinalizados += 1;
+      entry.inimigosDerrotados = n;
+    } else if(e.tipo==="TESTE_CRITICO"){
+      log.criticos += 1;
+    } else if(e.tipo==="TESTE_FALHA_CRITICA"){
+      log.falhasCriticas += 1;
+    }
+    log.eventos.push(entry);
+  });
+  if(log.eventos.length>EVENT_LOG_MAX) log.eventos = log.eventos.slice(-EVENT_LOG_MAX);
+  log.updatedAt = Date.now();
+  await sSet("event-log:"+advId, log, true);
+  return log;
+}
+/* Cache em memória do log da aventura atual, carregado ao entrar em jogo
+   e atualizado localmente a cada evento novo (sem re-ler o Firestore a
+   cada tick do painel de estatísticas). */
+var eventLogAtual = null;
+async function inicializarEventLogSessao(advId){
+  eventLogAtual = await carregarEventLog(advId);
+}
+
+/* Fase 2/3: barra "Missão atual" — mostra objetivo, próximo passo e (Fase
+   3) os ganchos de história ainda em aberto, guardados em
+   adv.estadoNarrativo. Fica escondida até a IA declarar o primeiro
+   objetivo (turno 1 de toda aventura nova ainda não tem isso). */
+function atualizarMissaoAtual(adv){
+  var bar = el("mission-bar");
+  if(!bar) return;
+  var en = adv && adv.estadoNarrativo;
+  if(!en || (!en.objetivo && !en.proximoPasso)){ bar.classList.add("hidden"); return; }
+  el("mission-objetivo").textContent = en.objetivo || "";
+  el("mission-proximo").textContent = en.proximoPasso ? ("Próximo passo: "+en.proximoPasso) : "";
+  var ganchos = Array.isArray(en.ganchosAtivos) ? en.ganchosAtivos.filter(Boolean) : [];
+  var toggle = el("mission-toggle"), lista = el("mission-ganchos");
+  if(ganchos.length){
+    toggle.classList.remove("hidden");
+    lista.innerHTML = ganchos.map(function(g){ return "<li>"+esc(g)+"</li>"; }).join("");
+  } else {
+    toggle.classList.add("hidden");
+    toggle.classList.remove("open");
+    lista.classList.add("hidden");
+    lista.innerHTML = "";
+  }
+  bar.classList.remove("hidden");
+}
+var missionToggleBtn = el("mission-toggle");
+if(missionToggleBtn) missionToggleBtn.addEventListener("click", function(){
+  var lista = el("mission-ganchos");
+  var open = !lista.classList.contains("hidden");
+  lista.classList.toggle("hidden", open);
+  missionToggleBtn.classList.toggle("open", !open);
+});
+/* Atualiza o cache local na hora (painel reage já no próximo tick) e
+   grava no Firestore em segundo plano — não trava a rolagem esperando
+   a rede, mas nunca depende do texto da IA para saber que houve 1/20. */
+function registerCriticalRoll(advId, sceneId, tipo){
+  if(eventLogAtual){
+    if(tipo==="TESTE_CRITICO") eventLogAtual.criticos += 1;
+    else if(tipo==="TESTE_FALHA_CRITICA") eventLogAtual.falhasCriticas += 1;
+  }
+  registrarEventos(advId, sceneId, [{tipo:tipo}], "rolagem").catch(function(e){ console.warn("event-log falhou:", e); });
+}
+
 function fmtTempoSessao(ms){
   var min = Math.floor(ms/60000);
   if(min < 60) return min+"min";
@@ -2929,8 +3135,20 @@ function atualizarPainelEstatisticas(msgs){
   if(!box) return;
   var elT = el("ss-turnos"), elI = el("ss-inimigos"), elS = el("ss-tempo");
   if(elT) elT.textContent = contarTurnos(ultimosMsgsParaStats);
-  if(elI) elI.textContent = contarInimigosDerrotados(ultimosMsgsParaStats);
+  // Fase 1: usa o contador estruturado (motor) quando existe, cai para o
+  // regex antigo só em aventuras/turnos que ainda não geraram nenhum
+  // evento estruturado (compatibilidade retroativa).
+  if(elI){
+    if(eventLogAtual && (eventLogAtual.combatesFinalizados>0 || eventLogAtual.eventos.length>0)){
+      elI.textContent = eventLogAtual.inimigosDerrotados;
+    } else {
+      elI.textContent = contarInimigosDerrotadosRegex(ultimosMsgsParaStats);
+    }
+  }
   if(elS) elS.textContent = sessionStartTs ? fmtTempoSessao(Date.now()-sessionStartTs) : "0min";
+  var elC = el("ss-criticos"), elF = el("ss-falhas");
+  if(elC) elC.textContent = eventLogAtual ? eventLogAtual.criticos : 0;
+  if(elF) elF.textContent = eventLogAtual ? eventLogAtual.falhasCriticas : 0;
 }
 setInterval(function(){ if(view==="game" && gameMode==="play") atualizarPainelEstatisticas(); }, 30000);
 
@@ -3350,6 +3568,14 @@ async function runGmTurn(advId, sceneId){
  var mineXp = data.xpConcedido.filter(function(x){ return normEmail(x.email)===session.email; })[0];
  if(mineXp && mineXp.quantidade) showXpToast(mineXp.quantidade, mineXp.motivo);
  }
+ // Fase 1: eventos estruturados declarados pelo Mestre (hoje só
+ // COMBATE_FINALIZADO) são validados e agregados no event-log da
+ // aventura — nunca aplicados "cegamente": registrarEventos() ignora
+ // tipos desconhecidos e limita valores fora do razoável.
+ if(data.eventos && Array.isArray(data.eventos) && data.eventos.length){
+   var logAtualizado = await registrarEventos(advId, sceneId, data.eventos, "ia");
+   if(logAtualizado) eventLogAtual = logAtualizado;
+ }
  if(adv.mode==="grupo"){
  var vez = data.vezDe ? normEmail(data.vezDe) : null;
  await sSet("turno:"+advId+":"+sceneId, vez ? {email:vez, desde:Date.now()} : null, true);
@@ -3494,7 +3720,24 @@ async function runGmTurn(advId, sceneId){
  advChanged = true;
  }
  if(adv.mode==="grupo" && !adv.cenasIndependentes && data.cenaAtiva){ freshAdv.activeSceneId = data.cenaAtiva; advChanged = true; }
+ // Fase 2: memória estruturada da aventura (objetivo, próximo passo,
+ // ganchos em aberto) — declarada pela IA a cada turno, mas guardada
+ // pelo app no doc da aventura, não só no texto solto. É o que alimenta
+ // a barra "Missão atual" durante o jogo e o resumo ao voltar depois.
+ if(data && data.estadoNarrativo && typeof data.estadoNarrativo==="object"){
+   var en = data.estadoNarrativo;
+   var objetivo = (typeof en.objetivo==="string" && en.objetivo.trim()) ? en.objetivo.trim().slice(0,240) : null;
+   var proximoPasso = (typeof en.proximoPasso==="string" && en.proximoPasso.trim()) ? en.proximoPasso.trim().slice(0,240) : null;
+   var ganchosAtivos = Array.isArray(en.ganchosAtivos)
+     ? en.ganchosAtivos.filter(function(g){ return typeof g==="string" && g.trim(); }).map(function(g){ return g.trim().slice(0,160); }).slice(0,5)
+     : [];
+   if(objetivo || proximoPasso || ganchosAtivos.length){
+     freshAdv.estadoNarrativo = { objetivo: objetivo, proximoPasso: proximoPasso, ganchosAtivos: ganchosAtivos, atualizadoEm: Date.now() };
+     advChanged = true;
+   }
+ }
  if(advChanged){ freshAdv.updatedAt = Date.now(); await sSet("adv:"+advId, freshAdv, true); currentAdv = freshAdv; }
+ atualizarMissaoAtual(freshAdv);
 
  if(adv.mode==="grupo"){
  var expectedRaw = (data.jogadoresEsperados||[]).map(normEmail);
@@ -6214,6 +6457,13 @@ el("sc-roll").addEventListener("click", function(){
  var cdPart = pendingCheck.cd ? (" contra CD "+pendingCheck.cd) : "";
  txt = "🎲 "+name+cdPart+": 1d20 ("+die+") "+(usedMod>=0?"+":"")+usedMod+" = "+total+(isManual?" [dado físico]":"");
  entry = {qty:1, sides:20, modifier:usedMod, rolls:[die], total:total, label:name, manual:isManual};
+ // Fase 1: crítico/falha crítica são fatos do dado, não da narrativa —
+ // o motor os registra aqui mesmo, sem esperar (nem confiar n)a IA dizer
+ // se "foi um crítico". Vale só para testes de perícia em 1d20 puro.
+ if(currentAdvId){
+   if(die===20) registerCriticalRoll(currentAdvId, currentSceneId, "TESTE_CRITICO");
+   else if(die===1) registerCriticalRoll(currentAdvId, currentSceneId, "TESTE_FALHA_CRITICA");
+ }
  if(character && skillMod(character, name)!==null){
  registerSkillUse(character, name);
  sSet("character:"+session.email, character, gameMode==="play");
@@ -6519,6 +6769,8 @@ var I18N_DICT = {
     "stats.tituloMini":"Estatísticas da aventura",
     "stats.turnos":"Total de turnos",
     "stats.inimigos":"Inimigos derrotados",
+    "stats.criticos":"Críticos (20 natural)",
+    "stats.falhas":"Falhas críticas (1 natural)",
     "stats.tempo":"Tempo de sessão",
     "stats.titulo":"Dados & Estatísticas",
     "tips.titulo":"Comandos rápidos"
@@ -6542,6 +6794,8 @@ var I18N_DICT = {
     "stats.tituloMini":"Adventure stats",
     "stats.turnos":"Total turns",
     "stats.inimigos":"Enemies defeated",
+    "stats.criticos":"Critical hits (natural 20)",
+    "stats.falhas":"Critical failures (natural 1)",
     "stats.tempo":"Session time",
     "stats.titulo":"Data & Statistics",
     "tips.titulo":"Quick commands"
@@ -6565,6 +6819,8 @@ var I18N_DICT = {
     "stats.tituloMini":"Estadísticas de la aventura",
     "stats.turnos":"Turnos totales",
     "stats.inimigos":"Enemigos derrotados",
+    "stats.criticos":"Críticos (20 natural)",
+    "stats.falhas":"Fallos críticos (1 natural)",
     "stats.tempo":"Tiempo de sesión",
     "stats.titulo":"Datos y Estadísticas",
     "tips.titulo":"Comandos rápidos"
