@@ -160,6 +160,20 @@ a{color:var(--arcane-bright);}
 .mastery-toast{background:rgba(138,92,196,.16)!important;border-color:var(--violet)!important;color:var(--violet-bright)!important;}
 .quota-wait{margin:8px 16px 0;padding:9px 12px;border-radius:9px;background:rgba(193,154,91,.14);border:1px solid var(--brass-dim);font-size:12px;color:var(--brass-bright);line-height:1.5;}
 .xp-toast{margin:8px 16px 0;padding:8px 12px;border-radius:9px;background:rgba(193,154,91,.16);border:1px solid var(--brass);font-size:12px;color:var(--brass-bright);font-weight:600;display:flex;align-items:center;gap:8px;animation:msgin .3s ease;}
+.xp-toast.achievement-toast{background:rgba(155,107,214,.16);border-color:#9b6bd6;color:#c9a8f0;}
+.companions-choice{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.companions-opt{display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 10px;border-radius:12px;background:var(--void-3);border:1.5px solid var(--line);cursor:pointer;text-align:center;transition:border-color .15s,background .15s;}
+.companions-opt:hover{border-color:var(--brass-dim);}
+.companions-opt.selected{border-color:var(--brass-bright);background:rgba(193,154,91,.12);}
+.companions-opt .co-glyph{font-size:22px;}
+.companions-opt .co-label{font-size:12.5px;font-weight:600;color:var(--text-hi);}
+.companions-opt .co-sub{font-size:10.5px;color:var(--text-lo);}
+.achv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:8px;}
+.achv-card{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 8px;border-radius:10px;background:var(--void-3);border:1px solid var(--line);text-align:center;opacity:.45;filter:grayscale(1);}
+.achv-card.ganha{opacity:1;filter:none;border-color:#9b6bd6;background:rgba(155,107,214,.08);}
+.achv-glyph{font-size:20px;}
+.achv-nome{font-size:11.5px;color:var(--text-hi);font-weight:600;}
+.achv-data{font-size:10px;color:var(--text-faint);}
 .new-msg-pill{position:absolute;left:50%;transform:translateX(-50%);bottom:78px;z-index:5;padding:8px 16px;border-radius:999px;border:1px solid var(--brass);background:var(--void-3);color:var(--brass-bright);font-size:12.5px;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.45);animation:msgin .2s ease;}
 .skill-check{margin:10px 16px 0;padding:11px 13px;border-radius:11px;background:linear-gradient(160deg,rgba(79,143,124,.16),var(--void-3));border:1px solid var(--arcane);animation:msgin .25s ease;}
 .sc-title{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--arcane-bright);font-weight:700;}
@@ -928,6 +942,31 @@ a{color:var(--arcane-bright);}
   <div class="modal-box" style="max-width:460px;">
     <div class="modal-head"><h3 id="item-titulo">Item</h3><button class="icon-btn" id="item-close" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button></div>
     <div class="modal-body" id="item-body"><p class="modal-note">Consultando…</p></div>
+  </div>
+</div>
+
+<!-- COMPANHEIROS DE IA (Fase 5, aventura solo) -->
+<div class="modal-overlay hidden" id="companions-overlay">
+  <div class="modal-box" style="max-width:460px;">
+    <div class="modal-head"><h3>Nova aventura solo</h3><button class="icon-btn" id="companions-close" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button></div>
+    <div class="modal-body">
+      <p class="card-lede" style="margin-bottom:14px;">Você quer companheiros controlados pela IA nesta aventura, ou prefere jogar sozinho?</p>
+      <div class="companions-choice">
+        <button type="button" class="companions-opt" data-choice="sozinho">
+          <span class="co-glyph">🗡️</span><span class="co-label">Sozinho</span><span class="co-sub">Só você e o Mestre.</span>
+        </button>
+        <button type="button" class="companions-opt" data-choice="com">
+          <span class="co-glyph">🤝</span><span class="co-label">Com companheiros</span><span class="co-sub">O Mestre cria e interpreta aliados de IA.</span>
+        </button>
+      </div>
+      <div class="field hidden" id="companions-desc-field" style="margin-top:12px;">
+        <label for="companions-desc">Descreva o grupo (opcional)</label>
+        <textarea id="companions-desc" class="text-input" rows="2" placeholder="ex.: uma maga élfica cautelosa e um guerreiro anão debochado — deixe em branco para o Mestre escolher"></textarea>
+      </div>
+      <div class="card-actions" style="margin-top:14px;">
+        <button type="button" class="primary-btn" id="companions-confirm" disabled>Criar aventura</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1941,7 +1980,7 @@ FICHA_START+"\n{ ...JSON... }\n"+FICHA_END+"\n\n" +
 
 var ADV_INTRO_SOLO = "Você é o Mestre de Jogo de uma aventura SOLO de RPG de fantasia, narrando para um único jogador. Você assume todos os papéis: narrador, NPCs, criaturas e árbitro das regras. Responda sempre em português do Brasil, em prosa envolvente.\n\n";
 var ADV_INTRO_GROUP = "Você é o Mestre de Jogo de uma aventura EM GRUPO de RPG de fantasia, narrando para vários jogadores simultaneamente. Cada mensagem de jogador vem prefixada com o nome de quem falou (ex: \"Alice: eu ataco...\"). Você assume todos os papéis: narrador, NPCs, criaturas e árbitro das regras. Responda sempre em português do Brasil, em prosa envolvente, dando espaço para cada personagem do grupo brilhar.\n\n";
-function advBody(isGroup){
+function advBody(isGroup, adv){
  return "REGRAS GERAIS\n- Mantenha-se sempre no papel de Mestre.\n" +
 "- SEJA CONCISO: cada resposta deve ter no máximo 3 parágrafos curtos (idealmente 120 a 180 palavras). Descreva o essencial com força, corte adjetivos supérfluos e não repita o que o jogador já sabe. Prefira uma imagem marcante a três frases de enfeite.\n" +
 "- Termine SEMPRE com uma pergunta ou gancho claro e direto, numa linha própria, dizendo o que o jogador precisa decidir agora (ex: \"O que você faz?\" ou \"Role Furtividade, CD 18.\").\n" +
@@ -1957,7 +1996,14 @@ function advBody(isGroup){
 "CONTROLE DE CENA: a aventura pode ter uma ou mais cenas simultâneas (ex: o grupo se dividiu). Apenas UMA cena está \"em foco\" por vez (campo \"cenaAtiva\"). Jogadores fora da cena ativa não veem nada até você voltar a atenção para eles. Prefira manter todos numa cena só; separe apenas quando fizer sentido narrativo, e sempre avise no texto quando cortar de uma cena para outra. Para reunir o grupo, volte a colocar todos na mesma cena.\n\n" +
 "UM DE CADA VEZ: dirija-se sempre a UM personagem por vez. Termine a narracao com uma pergunta ou situacao endereçada a ele pelo nome e preencha \"vezDe\" com o e-mail desse jogador — somente ele podera responder. Depois que ele agir, narre a consequencia e passe a vez ao proximo, alternando para que ninguem fique de fora. Nunca faca perguntas abertas ao grupo inteiro. Se a cena exigir reacao coletiva, ainda assim resolva um personagem por vez.\n\n" +
 "PEDIDOS DE AÇÃO E TEMPO: quando sua narração termina esperando uma ação de um ou mais jogadores da cena ativa, marque \"aguardandoAcao\": true e liste os e-mails desses jogadores em \"jogadoresEsperados\". O aplicativo dá até 7 minutos para cada um responder; quem não responder a tempo terá uma ação escolhida por você automaticamente na rodada seguinte. Quando não há pedido pendente, marque \"aguardandoAcao\": false e \"jogadoresEsperados\": [].\n\n"
-: "Esta é uma aventura SOLO: existe apenas o jogador e apenas uma cena contínua. Não divida cenas, não gerencie grupos e não use campos de cena — narre direto para ele e aguarde a resposta pelo tempo que ele precisar.\n\n") +
+: (
+  "Esta é uma aventura SOLO: existe apenas o jogador e apenas uma cena contínua. Não divida cenas, não gerencie grupos e não use campos de cena — narre direto para ele e aguarde a resposta pelo tempo que ele precisar.\n\n" +
+  ((adv && adv.companheirosAtivados) ?
+    "COMPANHEIROS DE IA (Fase 5): este jogador optou por ter companheiros de aventura controlados por você. "+
+    (adv.companheirosDescricao ? ("Composição desejada pelo jogador: \""+adv.companheirosDescricao+"\". ") : "Escolha livremente 2 companheiros com personalidades marcantes e papéis que complementem o personagem do jogador (ex.: um combatente robusto, um especialista em magia ou furtividade). ")+
+    "Apresente-os logo no início da aventura, dê nomes e personalidades reais, e faça-os agir, comentar e reagir na história como NPCs de verdade — inclusive em combate, descrevendo as ações deles. Mas NUNCA deixe os companheiros resolverem desafios no lugar do jogador: sempre pergunte a AÇÃO do jogador antes de decidir o resultado de uma cena, e dê a ele o papel central nas decisões e nos momentos de destaque. Os companheiros não têm ficha mecânica controlada pelo aplicativo — trate-os de forma inteiramente narrativa (sem pontos de vida ou dados que o app precise rastrear).\n\n"
+    : "")
+ )) +
 "FORMATO DE SAÍDA OBRIGATÓRIO: depois de todo texto narrativo, inclua sempre, sem exceção, um bloco oculto (os jogadores nunca o verão):\n\n" +
 FICHA_START+"\n{ ...JSON... }\n"+FICHA_END+"\n\n" +
 "Esquema exato:\n{\n"+
@@ -2024,11 +2070,11 @@ function buildSheetsBlock(adv, sheetsByEmail){
  });
  return out.join("\n")+"\n\n";
 }
-function buildAdvSystemPrompt(mode, rosterText, sheetsBlock){
+function buildAdvSystemPrompt(mode, rosterText, sheetsBlock, adv){
  var intro = mode==="grupo" ? ADV_INTRO_GROUP : ADV_INTRO_SOLO;
  var pdfNote = SISTEMA_REGRAS;
  var roster = rosterText ? ("PARTICIPANTES DESTA AVENTURA:\n"+rosterText+"\n\n") : "";
- return intro + pdfNote + (mode==="grupo" ? roster : "") + (sheetsBlock||"") + advBody(mode==="grupo");
+ return intro + pdfNote + (mode==="grupo" ? roster : "") + (sheetsBlock||"") + advBody(mode==="grupo", adv);
 }
 
 /* =========================================================
@@ -2050,6 +2096,7 @@ async function checkRegistered(email){
 
 async function logout(){
   pararTodosListeners();
+ if(gameMode==="play") await encerrarSessaoAtual();
  await sDel("profile", false);
  session = { email:null, name:null, apiKey:null, model:DEFAULT_MODEL_FALLBACK, modelChain:[DEFAULT_MODEL_FALLBACK] };
  character = null;
@@ -2399,21 +2446,49 @@ async function enterHub(){
  setTimeout(function(){ initAdSlot("ad-hub"); }, 300);
 }
 el("hub-new-solo").addEventListener("click", async function(){
- var card = el("hub-new-solo");
- if(card.dataset.busy) return;
- card.dataset.busy="1"; card.style.opacity=".55"; card.style.pointerEvents="none";
- try{
  var lim = await podeCriarAventura("solo");
  if(!lim.ok){ alert(lim.motivo); return; }
- var adv = await createAdventure("solo", "Aventura Solo", []);
- logAdminEvent("adventure_created", {id:adv.id, name:adv.name, mode:adv.mode, hostEmail:session.email});
- await enterPlay(adv.id, adv);
- }catch(err){
- console.error(err);
- alert("Não foi possível criar a aventura: "+err.message+"\n\nVerifique sua conexão e tente novamente.");
- }finally{
- card.style.opacity=""; card.style.pointerEvents=""; delete card.dataset.busy;
- }
+ abrirModalCompanheiros();
+});
+/* Fase 5: modal de escolha "sozinho vs. com companheiros de IA" antes de
+   criar a aventura solo. */
+var companionsChoice = null;
+function abrirModalCompanheiros(){
+  companionsChoice = null;
+  el("companions-desc").value = "";
+  el("companions-desc-field").classList.add("hidden");
+  el("companions-confirm").disabled = true;
+  document.querySelectorAll(".companions-opt").forEach(function(b){ b.classList.remove("selected"); });
+  el("companions-overlay").classList.remove("hidden");
+}
+el("companions-close").addEventListener("click", function(){ el("companions-overlay").classList.add("hidden"); });
+el("companions-overlay").addEventListener("click", function(e){ if(e.target===el("companions-overlay")) el("companions-overlay").classList.add("hidden"); });
+document.querySelectorAll(".companions-opt").forEach(function(btn){
+  btn.addEventListener("click", function(){
+    companionsChoice = btn.dataset.choice;
+    document.querySelectorAll(".companions-opt").forEach(function(b){ b.classList.toggle("selected", b===btn); });
+    el("companions-desc-field").classList.toggle("hidden", companionsChoice!=="com");
+    el("companions-confirm").disabled = false;
+  });
+});
+el("companions-confirm").addEventListener("click", async function(){
+  if(!companionsChoice) return;
+  var btn = el("companions-confirm");
+  btn.disabled = true; btn.textContent = "Criando…";
+  try{
+    var companionOpts = companionsChoice==="com"
+      ? { ativados:true, descricao: el("companions-desc").value }
+      : null;
+    var adv = await createAdventure("solo", "Aventura Solo", [], companionOpts);
+    logAdminEvent("adventure_created", {id:adv.id, name:adv.name, mode:adv.mode, hostEmail:session.email, companheiros:!!(companionOpts&&companionOpts.ativados)});
+    el("companions-overlay").classList.add("hidden");
+    await enterPlay(adv.id, adv);
+  }catch(err){
+    console.error(err);
+    alert("Não foi possível criar a aventura: "+err.message+"\n\nVerifique sua conexão e tente novamente.");
+  }finally{
+    btn.disabled = false; btn.textContent = "Criar aventura";
+  }
 });
 el("hub-new-group").addEventListener("click", function(){ openNewAdvModal(); });
 
@@ -2478,7 +2553,7 @@ async function refreshHubAdventures(){
  var badgeCls = isPendingInvite ? "convite" : adv.status;
  var badgeText = isPendingInvite ? "Convite" : (adv.status==="lobby"?"Aguardando":adv.status==="ativa"?"Em andamento":adv.status==="pausada"?"Pausada":"Concluída");
  var icon = adv.mode==="grupo" ? "👥" : "🗡️";
- var meta = (adv.mode==="grupo"?"Em grupo":"Solo")+' · anfitrião: '+esc(adv.hostName||"");
+ var meta = (adv.mode==="grupo"?"Em grupo":"Solo"+(adv.companheirosAtivados?" · 🤝 com companheiros":""))+' · anfitrião: '+esc(adv.hostName||"");
  // Fase 2: mostra o objetivo atual no card, quando já existe — ajuda o
  // jogador a lembrar "onde parei" antes mesmo de abrir a aventura.
  var objetivoLine = (adv.estadoNarrativo && adv.estadoNarrativo.objetivo)
@@ -2523,7 +2598,7 @@ function maybeActivateAdventure(adv){
  return adv;
 }
 
-async function createAdventure(mode, name, inviteEmails){
+async function createAdventure(mode, name, inviteEmails, companionOpts){
  var id = "adv_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,8);
  var now = Date.now();
  var members = [{email:session.email, name:session.name, status:"confirmado", invitedAt:now, respondedAt:now}];
@@ -2540,6 +2615,12 @@ async function createAdventure(mode, name, inviteEmails){
  scenes: mode==="solo" ? [{id:"principal", nome:"Principal", memberEmails:[session.email]}] : [],
  activeSceneId: mode==="solo" ? "principal" : null
  };
+ // Fase 5: companheiros de IA (só faz sentido em modo solo — em grupo os
+ // outros jogadores já cumprem esse papel).
+ if(mode==="solo" && companionOpts && companionOpts.ativados){
+   adv.companheirosAtivados = true;
+   adv.companheirosDescricao = (companionOpts.descricao||"").trim().slice(0,300);
+ }
  await sSet("adv:"+id, adv, true);
  for(var i=0;i<members.length;i++){
  var idx = await sGet("member-adv:"+members[i].email, true) || [];
@@ -2655,7 +2736,7 @@ async function enterPlay(advId, preloaded){
  currentAdv = adv;
  el("game-back").classList.remove("hidden");
  el("game-title").textContent = adv.name;
- el("game-subtitle").textContent = (adv.mode==="grupo" ? "Aventura em grupo" : "Aventura solo") + (adv.status==="encerrada" ? " · concluída" : "");
+ el("game-subtitle").textContent = (adv.mode==="grupo" ? "Aventura em grupo" : "Aventura solo") + (adv.companheirosAtivados ? " · 🤝 com companheiros" : "") + (adv.status==="encerrada" ? " · concluída" : "");
  character = await sGet("character:"+session.email, true) || character;
  await loadPartyCache();
  currentSceneId = mySceneId(adv);
@@ -2670,8 +2751,38 @@ async function enterPlay(advId, preloaded){
  updatePlayControls(adv);
  atualizarMissaoAtual(adv);
  await refreshPlay(true);
+ // Fase 4: linha de base desta sessão, pra medir o que mudou até o
+ // jogador sair (ver encerrarSessaoAtual) — vira o "resumo da última
+ // sessão" mostrado da próxima vez que a aventura for reaberta.
+ sessaoBase = {
+   turnos: contarTurnos(ultimosMsgsParaStats),
+   xp: (character && character.experiencia) || 0,
+   inimigosDerrotados: (eventLogAtual && eventLogAtual.inimigosDerrotados) || 0
+ };
  mostrarBoasVindasDeVolta(adv);
  ligarListenersDaAventura();
+}
+var sessaoBase = null;
+/* Fase 4: calcula o que mudou nesta sessão (desde enterPlay) e guarda
+   em adv.ultimaSessaoResumo — só grava se algo de fato aconteceu, pra
+   não sujar aventuras onde o jogador só espiou e voltou. Nunca trava a
+   navegação: qualquer falha aqui é só um resumo perdido, não um erro de
+   jogo. */
+async function encerrarSessaoAtual(){
+  if(!sessaoBase || !currentAdvId){ sessaoBase = null; return; }
+  var advId = currentAdvId;
+  var base = sessaoBase; sessaoBase = null;
+  var deltaTurnos = Math.max(0, contarTurnos(ultimosMsgsParaStats) - base.turnos);
+  var deltaXp = Math.max(0, ((character && character.experiencia) || 0) - base.xp);
+  var deltaInimigos = Math.max(0, ((eventLogAtual && eventLogAtual.inimigosDerrotados) || 0) - base.inimigosDerrotados);
+  if(deltaTurnos<=0 && deltaXp<=0 && deltaInimigos<=0) return;
+  try{
+    var fresh = await sGet("adv:"+advId, true);
+    if(!fresh) return;
+    fresh.ultimaSessaoResumo = { turnos:deltaTurnos, xpGanho:deltaXp, inimigosDerrotados:deltaInimigos, ts:Date.now() };
+    fresh.updatedAt = Date.now();
+    await sSet("adv:"+advId, fresh, true);
+  }catch(e){ /* resumo é cosmético — nunca impede sair da aventura */ }
 }
 /* Fase 2: "resumo da última sessão" — só a primeira vez que esta aventura
    é aberta nesta aba, e só quando já existe objetivo/gancho guardado (ou
@@ -2683,15 +2794,25 @@ function mostrarBoasVindasDeVolta(adv){
   if(!adv || !adv.id || missaoBoasVindasMostradas[adv.id]) return;
   missaoBoasVindasMostradas[adv.id] = true;
   var en = adv.estadoNarrativo;
-  if(!en || (!en.objetivo && !en.proximoPasso)) return;
+  var resumo = adv.ultimaSessaoResumo;
+  if((!en || (!en.objetivo && !en.proximoPasso)) && !resumo) return;
   // só mostra "bem-vindo de volta" se a última atualização não foi agora
   // mesmo (evita o toast aparecer logo depois do próprio primeiro turno)
-  if(en.atualizadoEm && (Date.now()-en.atualizadoEm) < 15000) return;
+  if(en && en.atualizadoEm && (Date.now()-en.atualizadoEm) < 15000) return;
   var scroll = el("chat-scroll");
   if(!scroll) return;
   var partes = ["Bem-vindo de volta!"];
-  if(en.objetivo) partes.push("Objetivo: "+en.objetivo);
-  if(en.proximoPasso) partes.push("Próximo passo: "+en.proximoPasso);
+  // Fase 4: resumo da última sessão, quando existe (turnos jogados, XP
+  // ganho, inimigos derrotados desde a última vez que o jogador entrou).
+  if(resumo && (resumo.turnos>0 || resumo.xpGanho>0 || resumo.inimigosDerrotados>0)){
+    var bits = [];
+    if(resumo.turnos>0) bits.push(resumo.turnos+" turno"+(resumo.turnos>1?"s":""));
+    if(resumo.xpGanho>0) bits.push("+"+resumo.xpGanho+" XP");
+    if(resumo.inimigosDerrotados>0) bits.push(resumo.inimigosDerrotados+" inimigo"+(resumo.inimigosDerrotados>1?"s":"")+" derrotado"+(resumo.inimigosDerrotados>1?"s":""));
+    partes.push("Na última sessão: "+bits.join(", "));
+  }
+  if(en && en.objetivo) partes.push("Objetivo: "+en.objetivo);
+  if(en && en.proximoPasso) partes.push("Próximo passo: "+en.proximoPasso);
   var d = document.createElement("div");
   d.className = "xp-toast welcome-toast";
   d.innerHTML = "🕯️ " + partes.map(esc).join(" · ");
@@ -2736,9 +2857,10 @@ function ligarListenersDaAventura(){
  }
  listenersAtivos = true;
 }
-el("game-back").addEventListener("click", function(){
+el("game-back").addEventListener("click", async function(){
   pararTodosListeners();
  if(gameMode==="creation"){ /* stay, creation must finish first */ return; }
+ if(gameMode==="play") await encerrarSessaoAtual();
  gameMode=null; currentAdvId=null; currentAdv=null; enterHub();
 });
 
@@ -3081,6 +3203,62 @@ async function inicializarEventLogSessao(advId){
   eventLogAtual = await carregarEventLog(advId);
 }
 
+/* =========================================================
+ CONQUISTAS (Fase 4)
+ Cada definição é checada contra dados que o MOTOR já calculou
+ (event-log estruturado da Fase 1, menorVidaPct calculado em
+ applyGmSheetUpdate, nível/estado da ficha) — nunca contra a narrativa
+ solta da IA. Uma vez desbloqueada, a conquista fica salva para sempre
+ na ficha do jogador (character.conquistas), independente da aventura.
+ ========================================================= */
+var ACHIEVEMENT_DEFS = [
+  { id:"primeiro-sangue", nome:"Primeiro sangue", desc:"Vença seu primeiro combate.", glyph:"⚔️",
+    check:function(ctx){ return !!(ctx.log && ctx.log.combatesFinalizados>=1); } },
+  { id:"diplomata", nome:"Diplomata", desc:"Encerre um combate sem derrotar ninguém.", glyph:"🕊️",
+    check:function(ctx){ return !!(ctx.log && (ctx.log.eventos||[]).some(function(e){ return e.tipo==="COMBATE_FINALIZADO" && e.inimigosDerrotados===0; })); } },
+  { id:"cacador", nome:"Caçador", desc:"Derrote 10 inimigos numa mesma aventura.", glyph:"🏹",
+    check:function(ctx){ return !!(ctx.log && ctx.log.inimigosDerrotados>=10); } },
+  { id:"sortudo", nome:"Sortudo", desc:"Tire 3 críticos naturais (20) numa mesma aventura.", glyph:"🎲",
+    check:function(ctx){ return !!(ctx.log && ctx.log.criticos>=3); } },
+  { id:"sobrevivente", nome:"Sobrevivente", desc:"Sobreviva com menos de 10% dos pontos de vida.", glyph:"💀",
+    check:function(ctx){ return !!(ctx.char && typeof ctx.char.menorVidaPct==="number" && ctx.char.menorVidaPct>0 && ctx.char.menorVidaPct<=0.10); } },
+  { id:"lenda", nome:"Lenda", desc:"Alcance o nível 10.", glyph:"👑",
+    check:function(ctx){ return !!(ctx.char && (ctx.char.nivel||0)>=10); } },
+  { id:"companheiros", nome:"Companheiros", desc:"Conclua uma aventura em grupo.", glyph:"🤝",
+    check:function(ctx){ return ctx.advConcluidaEmGrupo===true; } }
+];
+function conquistasDesbloqueadas(char){
+  return (char && Array.isArray(char.conquistas)) ? char.conquistas : [];
+}
+/* Roda os checks e persiste só o que for novo. Retorna as recém
+   desbloqueadas (para exibir toast) — nunca reabre uma já ganha. */
+async function verificarConquistas(ctx){
+  var char = ctx.char;
+  if(!char) return [];
+  var atuais = conquistasDesbloqueadas(char);
+  var jaTem = {}; atuais.forEach(function(a){ jaTem[a.id] = true; });
+  var novas = [];
+  ACHIEVEMENT_DEFS.forEach(function(def){
+    if(jaTem[def.id]) return;
+    try{ if(def.check(ctx)) novas.push(def); }catch(e){ /* checagem nunca derruba o turno */ }
+  });
+  if(!novas.length) return [];
+  char.conquistas = atuais.concat(novas.map(function(def){ return {id:def.id, desbloqueadaEm:Date.now()}; }));
+  await sSet("character:"+session.email, char, true);
+  novas.forEach(function(def){ showAchievementToast(def); });
+  return novas;
+}
+function showAchievementToast(def){
+  var scroll = el("chat-scroll");
+  if(!scroll) return;
+  var d = document.createElement("div");
+  d.className = "xp-toast achievement-toast";
+  d.innerHTML = def.glyph+" <b>Conquista desbloqueada:</b> "+esc(def.nome)+" · "+esc(def.desc);
+  scroll.appendChild(d);
+  requestAnimationFrame(function(){ scroll.scrollTop = scroll.scrollHeight; });
+  setTimeout(function(){ if(d.parentNode) d.remove(); }, 14000);
+}
+
 /* Fase 2/3: barra "Missão atual" — mostra objetivo, próximo passo e (Fase
    3) os ganchos de história ainda em aberto, guardados em
    adv.estadoNarrativo. Fica escondida até a IA declarar o primeiro
@@ -3421,6 +3599,14 @@ function applyGmSheetUpdate(existing, incoming){
  base.pontosVida.atual = Math.max(0, Math.min(base.pontosVida.atual, max));
  }
  }
+ // Fase 4: menor % de vida já visto, usado pela conquista "Sobrevivente" —
+ // calculado sempre pelo app a partir do PV já validado acima, nunca da
+ // narrativa da IA.
+ if(base.pontosVida && typeof base.pontosVida.maximo==="number" && base.pontosVida.maximo>0 && typeof base.pontosVida.atual==="number"){
+ var pctVida = base.pontosVida.atual / base.pontosVida.maximo;
+ var prevMin = (existing && typeof existing.menorVidaPct==="number") ? existing.menorVidaPct : 1;
+ base.menorVidaPct = Math.min(prevMin, pctVida);
+ }
  return base;
 }
 
@@ -3542,7 +3728,7 @@ async function runGmTurn(advId, sceneId){
         "Objetivo final do evento: " + adv.eventoContexto.objetivo + "\n" +
         "Construa a aventura a partir disso. Voce narra APENAS para o grupo listado abaixo; outros grupos vivem a mesma historia em paralelo, entao nao mencione nem controle personagens fora deste grupo, e nao divida nem remaneje cenas.\n\n";
     }
-    var sys = buildAdvSystemPrompt(adv.mode, rosterText, ctxEvento + buildSheetsBlock(adv, sheetsByEmail));
+    var sys = buildAdvSystemPrompt(adv.mode, rosterText, ctxEvento + buildSheetsBlock(adv, sheetsByEmail), adv);
 
  var contents=[];
  for(var i=0;i<msgs.length;i++){
@@ -3686,6 +3872,7 @@ async function runGmTurn(advId, sceneId){
  }
  character = await sGet("character:"+session.email, true) || character;
  renderCharacterSheet(character, "sheet-scroll");
+ await verificarConquistas({ char:character, log:eventLogAtual });
  await loadPartyCache();
  }
  var freshAdv = await sGet("adv:"+advId, true) || adv;
@@ -6067,6 +6254,7 @@ async function abrirEstatisticas(){
   var c = await sGet("character:"+session.email, true) || character;
   var hist = (c && Array.isArray(c.progressoHistorico)) ? c.progressoHistorico.slice() : [];
   var body = el("stats-body");
+  var conquistasHtml = renderBlocoConquistas(c);
   if(!hist.length){
     body.innerHTML =
       '<div class="ss-grid" style="margin-bottom:14px;">'+
@@ -6074,6 +6262,7 @@ async function abrirEstatisticas(){
         '<div class="ss-box"><div class="ss-v">'+(c&&c.experiencia||0)+'</div><div class="ss-l">XP acumulado</div></div>'+
         '<div class="ss-box"><div class="ss-v">0</div><div class="ss-l">Marcos registrados</div></div>'+
       '</div>'+
+      conquistasHtml+
       '<p class="modal-note">Ainda não há histórico de evolução — ele começa a ser registrado no próximo ganho de XP em jogo.</p>';
     return;
   }
@@ -6092,8 +6281,28 @@ async function abrirEstatisticas(){
       '<div class="ss-box"><div class="ss-v">'+hist.length+'</div><div class="ss-l">Marcos registrados</div></div>'+
     '</div>'+
     svg+
+    conquistasHtml+
     '<div class="log-title" style="margin-top:14px;">Linha do tempo recente</div>'+
     '<div style="max-height:220px;overflow-y:auto;">'+linhas+'</div>';
+}
+/* Fase 4: grade de conquistas, mostrando as já desbloqueadas com destaque
+   e as demais em cinza como "próximas metas" — reforça que dá pra buscar
+   mesmo sem estar em combate. */
+function renderBlocoConquistas(c){
+  var desbloqueadas = conquistasDesbloqueadas(c);
+  var porId = {}; desbloqueadas.forEach(function(a){ porId[a.id] = a; });
+  var cards = ACHIEVEMENT_DEFS.map(function(def){
+    var ganha = porId[def.id];
+    var cls = ganha ? "achv-card ganha" : "achv-card";
+    var quando = ganha ? new Date(ganha.desbloqueadaEm).toLocaleDateString("pt-BR") : "";
+    return '<div class="'+cls+'" title="'+esc(def.desc)+'">'+
+      '<span class="achv-glyph">'+def.glyph+'</span>'+
+      '<span class="achv-nome">'+esc(def.nome)+'</span>'+
+      (ganha ? '<span class="achv-data">'+quando+'</span>' : '<span class="achv-data">🔒</span>')+
+      '</div>';
+  }).join("");
+  return '<div class="log-title" style="margin-top:14px;">Conquistas ('+desbloqueadas.length+'/'+ACHIEVEMENT_DEFS.length+')</div>'+
+    '<div class="achv-grid">'+cards+'</div>';
 }
 function renderGraficoProgresso(hist){
   var w = 560, h = 160, pad = 28;
@@ -6157,6 +6366,10 @@ el("btn-finish").addEventListener("click", async function(){
  currentAdv = fresh;
  updatePlayControls(fresh);
  el("chat-form").classList.add("hidden");
+ if(fresh.mode==="grupo"){
+   character = await sGet("character:"+session.email, true) || character;
+   await verificarConquistas({ char:character, log:eventLogAtual, advConcluidaEmGrupo:true });
+ }
  alert("Aventura concluída! Use o botão de exportar (↓) para gerar o roteiro.");
 });
 
