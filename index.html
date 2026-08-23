@@ -3758,9 +3758,14 @@ async function runGmTurn(advId, sceneId){
  // COMBATE_FINALIZADO) são validados e agregados no event-log da
  // aventura — nunca aplicados "cegamente": registrarEventos() ignora
  // tipos desconhecidos e limita valores fora do razoável.
+ // Envolvido em try/catch: uma falha aqui (ex.: rede instável) é só um
+ // contador de estatística perdido, não pode derrubar o turno inteiro
+ // depois que a narrativa e a ficha já foram salvas com sucesso.
  if(data.eventos && Array.isArray(data.eventos) && data.eventos.length){
-   var logAtualizado = await registrarEventos(advId, sceneId, data.eventos, "ia");
-   if(logAtualizado) eventLogAtual = logAtualizado;
+   try{
+     var logAtualizado = await registrarEventos(advId, sceneId, data.eventos, "ia");
+     if(logAtualizado) eventLogAtual = logAtualizado;
+   }catch(e){ console.warn("Falha ao registrar eventos estruturados:", e); }
  }
  if(adv.mode==="grupo"){
  var vez = data.vezDe ? normEmail(data.vezDe) : null;
@@ -3872,7 +3877,10 @@ async function runGmTurn(advId, sceneId){
  }
  character = await sGet("character:"+session.email, true) || character;
  renderCharacterSheet(character, "sheet-scroll");
- await verificarConquistas({ char:character, log:eventLogAtual });
+ // Fase 4: conquistas são um bônus cosmético — uma falha ao salvar não
+ // pode transformar um turno bem-sucedido num erro exibido ao jogador.
+ try{ await verificarConquistas({ char:character, log:eventLogAtual }); }
+ catch(e){ console.warn("Falha ao verificar conquistas:", e); }
  await loadPartyCache();
  }
  var freshAdv = await sGet("adv:"+advId, true) || adv;
@@ -5011,6 +5019,7 @@ async function abrirOficina(){
   atualizarCabecalhoOficina();
   var salvo = await sGet("forge-chat:"+session.email, true);
   forgeMessages = (salvo && salvo.messages) || [];
+  ultimoCatalogoOficina = null;
   renderForgeChat();
   if(await renderProducaoEmCurso()) return;
   var cap = capacidadeOficina(character);
@@ -5021,6 +5030,14 @@ async function abrirOficina(){
   }
   if(!forgeMessages.length){
     enviarMensagemOficina("[O aventureiro chega à oficina. Cumprimente-o em UMA frase e, na mesma resposta, apresente JÁ o catálogo do que ele consegue produzir agora com os materiais do inventário — preencha o campo \"catalogo\" do bloco. Não pergunte o que ele quer antes de mostrar as opções.]", {display:false});
+  } else if(salvo && salvo.catalogo && salvo.catalogo.length){
+    // O catálogo em si não ficava salvo — só o texto do chat. Sem isto,
+    // o jogador reabria a oficina e via a fala do artesão descrevendo os
+    // itens, mas sem nenhum botão pra escolher; precisava conversar de
+    // novo só pra recuperar a lista. Agora o último catálogo proposto é
+    // restaurado (com uma geração nova e segura — ver renderCatalogo).
+    ultimoCatalogoOficina = salvo.catalogo;
+    renderCatalogo(salvo.catalogo);
   }
 }
 
@@ -5065,11 +5082,22 @@ function renderCatalogo(cat){
     return;
   }
   var html = '<div class="cat-box"><div class="cat-t">O que você consegue produzir agora</div>';
+  // Bug corrigido: cada renderização do catálogo (uma por resposta do
+  // artesão) empilha uma NOVA caixa no histórico do chat, mas antes só
+  // existia UM objeto catalogoAtual compartilhado, reindexado do zero a
+  // cada vez. Um botão "Produzir" de uma caixa antiga ainda visível na
+  // tela acabava lendo o catálogo mais recente na mesma posição — ou
+  // seja, clicar num item antigo podia produzir um item diferente do
+  // que estava escrito no botão. Agora cada geração de catálogo tem seu
+  // próprio namespace, então um botão antigo sempre aponta para o item
+  // que ele realmente mostra, não importa quantos catálogos vieram depois.
+  var geracao = ++catalogGeracaoSeq;
+  catalogosPorGeracao[geracao] = {};
   viaveis.forEach(function(it, idx){
     var nivel = parseInt(it.nivelItem,10)||1;
     var rar = String(it.raridade||"comum").toLowerCase();
     var cd = cdDeProducao(nivel, rar), horas = horasDeProducao(nivel, rar), custo = custoDeProducao(nivel, rar);
-    catalogoAtual[idx] = {nome:it.nome, raridade:rar, nivelItem:nivel, descricao:it.descricao||"",
+    catalogosPorGeracao[geracao][idx] = {nome:it.nome, raridade:rar, nivelItem:nivel, descricao:it.descricao||"",
                           consumiveis:it.consumiveis||[], cd:cd, horas:horas, custo:custo};
     html += '<div class="cat-item"><div class="ci-h"><b>'+esc(it.nome)+
       '</b><span class="rar '+esc(rar)+'">'+esc(LABEL_RARIDADE[rar])+'</span></div>'+
@@ -5077,7 +5105,7 @@ function renderCatalogo(cat){
       '<div class="ci-m">Materiais: '+esc((it.consumiveis||[]).join(", ")||"nenhum")+'</div>'+
       '<div class="ci-s">nível '+nivel+' · CD '+cd+' · '+fmtDuracao(horas)+' · '+fmtMoeda(custo)+
       ' · vale '+fmtMoeda(precoDoItem(nivel,rar))+'</div>'+
-      '<button class="mk-btn" data-produzir="'+idx+'">Produzir</button></div>';
+      '<button class="mk-btn" data-produzir="'+idx+'" data-geracao="'+geracao+'">Produzir</button></div>';
   });
   html += '</div>';
   var d = document.createElement("div");
@@ -5085,12 +5113,21 @@ function renderCatalogo(cat){
   box.appendChild(d);
   box.scrollTop = box.scrollHeight;
   d.querySelectorAll("[data-produzir]").forEach(function(b){
-    b.addEventListener("click", function(){ iniciarProducao(catalogoAtual[b.getAttribute("data-produzir")]); });
+    b.addEventListener("click", function(){
+      var g = catalogosPorGeracao[b.getAttribute("data-geracao")];
+      iniciarProducao(g && g[b.getAttribute("data-produzir")]);
+    });
   });
 }
 
-var catalogoAtual = {};
+var catalogGeracaoSeq = 0;
+var catalogosPorGeracao = {};
 var pediuCatalogo = false;
+/* Último catálogo mostrado pelo artesão, guardado junto com o chat da
+   oficina — sem isto, fechar e reabrir a oficina perdia os botões de
+   "Produzir" (só o texto ficava salvo). Fica null sempre que o catálogo
+   deixa de valer (produção iniciada/concluída, ou reset do chat). */
+var ultimoCatalogoOficina = null;
 
 async function iniciarProducao(item){
   if(!item) return;
@@ -5141,7 +5178,8 @@ async function iniciarProducao(item){
   }, true);
   renderForgeChat();
   atualizarCabecalhoOficina();
-  await sSet("forge-chat:"+session.email, {messages:forgeMessages}, true);
+  ultimoCatalogoOficina = null; // materiais/ouro já foram gastos — catálogo anterior não vale mais
+  await sSet("forge-chat:"+session.email, {messages:forgeMessages, catalogo:null}, true);
 }
 
 async function concluirProducao(res){
@@ -5167,7 +5205,8 @@ async function concluirProducao(res){
       text:"O trabalho não deu certo. Os materiais se perderam na tentativa — acontece até com os melhores artesãos."});
   }
   await sDel("producao:"+session.email, true);
-  await sSet("forge-chat:"+session.email, {messages:forgeMessages}, true);
+  ultimoCatalogoOficina = null; // materiais mudaram desde o catálogo mostrado — não é mais confiável
+  await sSet("forge-chat:"+session.email, {messages:forgeMessages, catalogo:null}, true);
   renderForgeChat();
   atualizarCabecalhoOficina();
   if(!el("market-overlay").classList.contains("hidden")) renderMercado();
@@ -5189,8 +5228,8 @@ async function enviarMensagemOficina(texto, opts){
     forgeMessages.push({role:"model", text: ext.clean || "(o artesão fica em silêncio…)", display:true});
     renderForgeChat();
     if(ext.data && ext.data.catalogo){
-      catalogoAtual = {};
       renderCatalogo(ext.data.catalogo);
+      ultimoCatalogoOficina = ext.data.catalogo;
       pediuCatalogo = false;
     } else if(!pediuCatalogo){
       // o artesão respondeu sem listar nada: pede o catálogo uma única vez
@@ -5205,7 +5244,7 @@ async function enviarMensagemOficina(texto, opts){
   }finally{
     forgeLoading = false;
     el("forge-send").disabled = false;
-    await sSet("forge-chat:"+session.email, {messages:forgeMessages}, true);
+    await sSet("forge-chat:"+session.email, {messages:forgeMessages, catalogo:ultimoCatalogoOficina}, true);
     atualizarCabecalhoOficina();
     renderForgeChat();
   }
@@ -5215,7 +5254,9 @@ el("forge-close").addEventListener("click", function(){ el("forge-overlay").clas
 el("forge-overlay").addEventListener("click", function(e){ if(e.target===el("forge-overlay")) el("forge-overlay").classList.add("hidden"); });
 el("forge-reset").addEventListener("click", async function(){
   forgeMessages = [];
-  await sSet("forge-chat:"+session.email, {messages:[]}, true);
+  ultimoCatalogoOficina = null;
+  catalogosPorGeracao = {};
+  await sSet("forge-chat:"+session.email, {messages:[], catalogo:null}, true);
   renderForgeChat();
   abrirOficina();
 });
@@ -6368,7 +6409,8 @@ el("btn-finish").addEventListener("click", async function(){
  el("chat-form").classList.add("hidden");
  if(fresh.mode==="grupo"){
    character = await sGet("character:"+session.email, true) || character;
-   await verificarConquistas({ char:character, log:eventLogAtual, advConcluidaEmGrupo:true });
+   try{ await verificarConquistas({ char:character, log:eventLogAtual, advConcluidaEmGrupo:true }); }
+   catch(e){ console.warn("Falha ao verificar conquistas:", e); }
  }
  alert("Aventura concluída! Use o botão de exportar (↓) para gerar o roteiro.");
 });
