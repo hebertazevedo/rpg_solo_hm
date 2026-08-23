@@ -168,6 +168,19 @@ a{color:var(--arcane-bright);}
 .companions-opt .co-glyph{font-size:22px;}
 .companions-opt .co-label{font-size:12.5px;font-weight:600;color:var(--text-hi);}
 .companions-opt .co-sub{font-size:10.5px;color:var(--text-lo);}
+.plan-benefits{list-style:none;margin:0 0 16px;padding:0;display:flex;flex-direction:column;gap:8px;}
+.plan-benefits li{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;color:var(--text-hi);}
+.plan-benefits li::before{content:"✓";color:var(--brass-bright);font-weight:700;flex-shrink:0;}
+.plan-price{font-size:15px;font-weight:700;color:var(--brass-bright);margin:0 0 14px;}
+.pay-method{display:flex;align-items:center;gap:10px;padding:12px;border-radius:10px;background:var(--void-3);border:1px solid var(--line);margin-bottom:10px;}
+.pay-method .pm-icon{font-size:18px;flex-shrink:0;}
+.pay-method .pm-info{flex:1;min-width:0;}
+.pay-method .pm-info b{font-size:12.5px;color:var(--text-hi);display:block;}
+.pay-method .pm-info span{font-size:11px;color:var(--text-lo);word-break:break-all;}
+.plan-active-badge{display:flex;align-items:center;gap:8px;padding:12px;border-radius:10px;background:rgba(120,200,140,.14);border:1px solid #4caf6f;color:#8fe0a8;font-size:12.5px;font-weight:600;margin-bottom:12px;}
+.plan-pending-badge{display:flex;align-items:center;gap:8px;padding:12px;border-radius:10px;background:rgba(193,154,91,.14);border:1px solid var(--brass-dim);color:var(--brass-bright);font-size:12px;margin-bottom:12px;}
+#hub-upgrade.apoiador{color:var(--brass-bright);}
+#hub-upgrade.apoiador svg{fill:var(--brass-bright);}
 .achv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:8px;}
 .achv-card{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 8px;border-radius:10px;background:var(--void-3);border:1px solid var(--line);text-align:center;opacity:.45;filter:grayscale(1);}
 .achv-card.ganha{opacity:1;filter:none;border-color:#9b6bd6;background:rgba(155,107,214,.08);}
@@ -680,6 +693,9 @@ a{color:var(--arcane-bright);}
  <button class="icon-btn hidden" id="hub-admin" title="Painel Admin" aria-label="Painel Admin">
  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
  </button>
+ <button class="icon-btn" id="hub-upgrade" title="Plano Apoiador" aria-label="Plano Apoiador">
+ <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.6 1.7 6.9L12 17.3 5.7 20.7l1.7-6.9L2 9.2l7.1-.6z"/></svg>
+ </button>
  <button class="icon-btn" id="hub-key" title="Trocar chave do Gemini" aria-label="Trocar chave do Gemini">
  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 19 4"/><path d="m16 7 3 3"/><path d="m19 4 2 2"/></svg>
  </button>
@@ -970,6 +986,14 @@ a{color:var(--arcane-bright);}
   </div>
 </div>
 
+<!-- PLANO APOIADOR (upgrade / pagamento) -->
+<div class="modal-overlay hidden" id="upgrade-overlay">
+  <div class="modal-box" style="max-width:480px;">
+    <div class="modal-head"><h3>Plano Apoiador</h3><button class="icon-btn" id="upgrade-close" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button></div>
+    <div class="modal-body" id="upgrade-body"><p class="modal-note">Carregando…</p></div>
+  </div>
+</div>
+
 <!-- DADOS & ESTATÍSTICAS -->
 <div class="modal-overlay hidden" id="stats-overlay">
   <div class="modal-box" style="max-width:640px;">
@@ -1151,6 +1175,29 @@ var MODELOS_CONHECIDOS = [
   "gemini-3.1-pro","gemini-2.5-pro"
 ];
 var ADMIN_EMAIL = "azevedo.hebert@gmail.com";
+
+/* =========================================================
+   PAGAMENTOS — plano pago (Apoiador)
+   Preencha os campos abaixo com seus dados reais de recebimento.
+   Deixar um campo em branco esconde aquele método de pagamento
+   automaticamente na tela de upgrade — não precisa mexer em mais
+   nada além destas linhas.
+
+   IMPORTANTE — o que este app faz e o que ele NÃO faz:
+   Não existe processamento de cartão nem confirmação automática de
+   pagamento aqui dentro (isso exigiria um backend com chave secreta
+   de um processador de pagamentos, e este app não tem servidor
+   próprio). O fluxo é: o jogador paga por um destes canais externos,
+   avisa pelo botão "Já paguei" dentro do app, e o ADMINISTRADOR
+   confirma manualmente no Painel Admin → Solicitações de upgrade.
+   Isso é seguro (nada é liberado sem uma ação explícita do admin) e
+   é a mesma abordagem que apps solo/indie costumam usar antes de
+   automatizar a cobrança com um backend próprio.
+   ========================================================= */
+var PRECO_PLANO_TEXTO = "";        // ex.: "R$ 14,90/mês" — texto livre, só para exibição
+var PAGAMENTO_PIX_CHAVE = "";      // ex.: "seuemail@exemplo.com", CPF/CNPJ ou telefone
+var PAGAMENTO_PIX_NOME = "";       // nome do recebedor, mostrado junto da chave Pix
+var PAGAMENTO_LINK_CARTAO = "";    // ex.: link de pagamento do Stripe/Mercado Pago/PagSeguro/Kirvano
 var SHEETS_URL = "https://script.google.com/macros/s/AKfycbxmw5O3rNuFOYStis1ShHG04-eCD5iJLY-J-rPTDanY2WNmIo0rPFKaSfggnkGOuQ8t/exec";
 var adminConfig = null; // {sheetsWebhookUrl}
 
@@ -1192,6 +1239,27 @@ async function fsGet(key){
     return (d && d.value!==undefined) ? d.value : null;
   }catch(e){ console.warn("Firestore get falhou ("+key+"):", e.message); return FS_ERROR; }
 }
+/* Para a maioria das chaves, o "dono" é quem está gravando agora — faz
+   sentido para adv:, event-log:, etc. Mas character:/pub: são
+   diferentes: o e-mail já está embutido na própria chave, e ele é
+   quem manda, não quem está gravando.
+   BUG REAL CORRIGIDO: durante um turno em grupo, o jogador cuja ação
+   disparou a resposta do Mestre é quem grava a ficha de TODOS os
+   membros do grupo (para aplicar XP/itens/etc. de uma vez). Antes,
+   isso sobrescrevia o campo "owner" da ficha de cada colega com o
+   e-mail de quem agiu no turno — não o dono de verdade. Depois de
+   algumas rodadas em grupo, a ficha de um jogador podia "pertencer"
+   a outra pessoa no Firestore, e as regras (que exigem que o dono
+   bata para editar/excluir a própria ficha) passavam a bloquear até
+   o dono real editar ou excluir a própria ficha. Derivar o dono da
+   própria chave, em vez de quem está gravando, elimina esse desvio
+   para sempre — não importa quem tecnicamente executa a gravação.
+   */
+function ownerForKey(key){
+  var m = /^(?:character|pub):(.+)$/.exec(key||"");
+  if(m) return normEmail(m[1]);
+  return (session && session.email) || null;
+}
 async function fsPut(key, value){
   var fb = window.__fb;
   try{
@@ -1203,7 +1271,7 @@ async function fsPut(key, value){
       json: JSON.stringify(value),
       key: key,
       updatedAt: Date.now(),
-      owner: (session && session.email) || null
+      owner: ownerForKey(key)
     });
     return true;
   }catch(e){ console.warn("Firestore put falhou ("+key+"):", e.message); return false; }
@@ -1405,7 +1473,7 @@ async function sheetsList(kind){
 /* =========================================================
  SESSION STATE
  ========================================================= */
-var session = { email:null, name:null, apiKey:null, model:DEFAULT_MODEL_FALLBACK, modelChain:[DEFAULT_MODEL_FALLBACK] };
+var session = { email:null, name:null, apiKey:null, model:DEFAULT_MODEL_FALLBACK, modelChain:[DEFAULT_MODEL_FALLBACK], planoPago:false };
 var character = null; // own character JSON
 var view = "auth"; // auth | hub | lobby | game
 var gameMode = null; // 'creation' | 'play'
@@ -1432,7 +1500,7 @@ var partyCache = {}; // email -> character
 function isSyncedKey(key){
  // TODA chave compartilhada precisa estar aqui, senao o dado fica preso no
  // navegador de quem criou e mais ninguem enxerga.
- return /^(pub:|character:|adv:|member-adv:|scene-msgs:|pending-action:|check:|admin-config|event:|events-index|event-log:|market:|market-index|market-treasury|crafted:|producao:|ledger:|forge-chat:|turno:|iteminfo:|producao:)/.test(key);
+ return /^(pub:|character:|adv:|member-adv:|scene-msgs:|pending-action:|check:|admin-config|event:|events-index|event-log:|market:|market-index|market-treasury|crafted:|producao:|ledger:|forge-chat:|turno:|iteminfo:|producao:|subscription:|upgrade-request:)/.test(key);
 }
 /* Values are stored wrapped as {__v:rev, __t:ts, d:data} so a stale or failed
  remote write can never overwrite newer local data on screen. */
@@ -1534,7 +1602,12 @@ async function sSet(key, value, shared){
 }
 async function sDel(key, shared){
  try{ if(window.storage) await window.storage.delete(key, !!shared); }catch(e){}
- if(shared && isSyncedKey(key)) await sheetsPut("kv", key, null);
+ // Bug corrigido: fsPut()/sheetsPut() já sabiam dizer se a exclusão no
+ // Firestore funcionou ou foi negada (ex.: pelas regras de segurança),
+ // mas sDel() jogava esse resultado fora — quem chamava nunca sabia se
+ // a exclusão remota realmente aconteceu. Agora sDel() devolve isso.
+ if(shared && isSyncedKey(key)) return await sheetsPut("kv", key, null);
+ return true;
 }
 async function sList(prefix, shared){
  var keys = [];
@@ -2098,7 +2171,7 @@ async function logout(){
   pararTodosListeners();
  if(gameMode==="play") await encerrarSessaoAtual();
  await sDel("profile", false);
- session = { email:null, name:null, apiKey:null, model:DEFAULT_MODEL_FALLBACK, modelChain:[DEFAULT_MODEL_FALLBACK] };
+ session = { email:null, name:null, apiKey:null, model:DEFAULT_MODEL_FALLBACK, modelChain:[DEFAULT_MODEL_FALLBACK], planoPago:false };
  character = null;
  el("auth-error").classList.add("hidden");
  showView("auth");
@@ -2166,8 +2239,16 @@ el("hub-delete-char").addEventListener("click", async function(){
       }
     }
     await sDel("member-adv:"+session.email, true);
-    await sDel("character:"+session.email, true);
+    var apagouFicha = await sDel("character:"+session.email, true);
     await sDel("char-creation-chat", false);
+    if(!apagouFicha){
+      // Bug corrigido: antes, se o Firestore recusasse a exclusão (ex.:
+      // regra de segurança), o app mostrava "Personagem excluído" mesmo
+      // assim — a ficha continuava existindo de verdade no servidor e
+      // reaparecia no próximo login. Agora a falha é mostrada de verdade.
+      alert("Não foi possível excluir sua ficha no servidor agora (pode ser a conexão ou uma permissão desatualizada). Nada foi apagado — tente de novo em instantes. Se persistir, avise o administrador.");
+      return;
+    }
     logAdminEvent("character_deleted", {email:session.email, nome:nome, aventuras:advIds.length});
     character = null;
     creationMessages = [];
@@ -2435,6 +2516,13 @@ async function enterHub(){
  el("hub-admin").classList.toggle("hidden", session.email!==ADMIN_EMAIL);
  el("hub-event").classList.toggle("hidden", session.email!==ADMIN_EMAIL);
  renderEventos();
+ // Recarrega o status do plano aqui (não a cada poll) para refletir uma
+ // aprovação recente do admin sem exigir logout, sem ficar reconsultando
+ // o Firestore a cada poll.
+ await carregarPlanoPago();
+ var upBtn = el("hub-upgrade");
+ upBtn.classList.toggle("apoiador", !!session.planoPago);
+ upBtn.title = session.planoPago ? "Você é Apoiador ✓" : "Plano Apoiador";
  // rele a ficha: o ouro pode ter sido creditado por uma venda enquanto
  // este jogador estava parado no hub
  var fichaAtual = await sGet("character:"+session.email, true);
@@ -2447,7 +2535,7 @@ async function enterHub(){
 }
 el("hub-new-solo").addEventListener("click", async function(){
  var lim = await podeCriarAventura("solo");
- if(!lim.ok){ alert(lim.motivo); return; }
+ if(!lim.ok){ abrirUpgrade("limite_aventuras"); return; }
  abrirModalCompanheiros();
 });
 /* Fase 5: modal de escolha "sozinho vs. com companheiros de IA" antes de
@@ -2655,7 +2743,7 @@ el("newadv-create").addEventListener("click", async function(){
  var btn = el("newadv-create"); btn.disabled=true; btn.textContent="Criando…";
  try{
  var lim = await podeCriarAventura("grupo");
- if(!lim.ok){ errBox.textContent = lim.motivo; errBox.classList.remove("hidden"); btn.disabled=false; btn.textContent="Criar aventura"; return; }
+ if(!lim.ok){ errBox.innerHTML = esc(lim.motivo)+' <a href="#" id="newadv-upgrade-link">Ver planos</a>'; errBox.classList.remove("hidden"); btn.disabled=false; btn.textContent="Criar aventura"; var upL=el("newadv-upgrade-link"); if(upL) upL.addEventListener("click", function(e){ e.preventDefault(); abrirUpgrade("limite_aventuras"); }); return; }
  var adv = await createAdventure("grupo", name, emails);
  logAdminEvent("adventure_created", {id:adv.id, name:adv.name, mode:adv.mode, hostEmail:session.email});
  el("newadv-overlay").classList.add("hidden");
@@ -4291,7 +4379,28 @@ var LIMITE_GRUPO_ATIVAS = 1;       // aventuras em grupo simultâneas (por ora, 
 var LIMITE_ARQUIVO_GRATUITO = 3;   // aventuras concluídas visíveis no plano gratuito
 
 function temPlanoPago(email){
-  return normEmail(email) === ADMIN_EMAIL;
+  var norm = normEmail(email);
+  if(norm === ADMIN_EMAIL) return true;
+  // Checagem só é confiável para o PRÓPRIO usuário logado — o status do
+  // plano é carregado uma vez (ver carregarPlanoPago) e guardado em
+  // session.planoPago. Verificar o plano de outra pessoa exigiria uma
+  // leitura assíncrona, e nenhum ponto do app precisa disso hoje.
+  if(norm === session.email) return !!session.planoPago;
+  return false;
+}
+/* Carrega (ou recarrega) o status do plano do jogador logado a partir do
+   Firestore. Chamado no login e de novo nos pontos onde o gate é checado
+   (oficina, exportação, hub) para refletir uma aprovação recente do
+   admin sem exigir logout — mas o valor em si fica em session.planoPago,
+   então temPlanoPago() continua síncrona e todo o resto do app não
+   precisa mudar (ver comentário original abaixo). */
+async function carregarPlanoPago(){
+  if(normEmail(session.email) === ADMIN_EMAIL){ session.planoPago = true; return true; }
+  try{
+    var sub = await sGet("subscription:"+session.email, true);
+    session.planoPago = !!(sub && sub.ativo && (!sub.expiraEm || sub.expiraEm > Date.now()));
+  }catch(e){ /* falha de rede não deve travar o boot — mantém o último valor conhecido */ }
+  return !!session.planoPago;
 }
 function podeProduzirItens(email){ return temPlanoPago(email); }
 /* O administrador produz sem catálogo, sem teste e sem espera: precisa poder
@@ -4299,6 +4408,117 @@ function podeProduzirItens(email){ return temPlanoPago(email); }
 function produzLivremente(email){ return normEmail(email) === ADMIN_EMAIL; }
 function podeExportar(email){ return temPlanoPago(email); }
 function podeArquivoCompleto(email){ return temPlanoPago(email); }
+
+/* =========================================================
+   UPGRADE / PAGAMENTO
+   Fluxo honesto de "fulfillment manual": este app não processa cartão
+   nem confirma pagamento sozinho (isso exigiria um backend com chave
+   secreta de processador de pagamentos, que este projeto não tem).
+   O jogador paga por um canal externo (Pix ou link de pagamento),
+   avisa pelo botão "Já paguei" — que grava um pedido em
+   upgrade-request:<email> — e o administrador aprova manualmente no
+   Painel Admin, o que grava subscription:<email>.ativo = true.
+   Nada é liberado sem essa aprovação explícita.
+   ========================================================= */
+async function concederPlanoPago(email){
+  email = normEmail(email);
+  await sSet("subscription:"+email, {
+    email:email, ativo:true, plano:"apoiador", expiraEm:null,
+    concedidoEm:Date.now(), concedidoPor:session.email
+  }, true);
+  logAdminEvent("upgrade_approved", {email:email, por:session.email});
+  if(email===session.email) session.planoPago = true;
+}
+var MOTIVOS_UPGRADE = {
+  oficina: "A produção de itens na oficina é um recurso do Plano Apoiador.",
+  exportacao: "Exportar a crônica em PDF é um recurso do Plano Apoiador.",
+  limite_aventuras: "Você atingiu o limite de aventuras simultâneas do plano gratuito.",
+  arquivo: "Ver todo o histórico de aventuras concluídas é um recurso do Plano Apoiador."
+};
+async function abrirUpgrade(origem){
+  el("upgrade-overlay").classList.remove("hidden");
+  el("upgrade-body").innerHTML = '<p class="modal-note">Carregando…</p>';
+  await carregarPlanoPago();
+  renderUpgradeBody(origem);
+}
+async function renderUpgradeBody(origem){
+  var body = el("upgrade-body");
+  var motivo = MOTIVOS_UPGRADE[origem] || "";
+  if(temPlanoPago(session.email)){
+    body.innerHTML =
+      '<div class="plan-active-badge">✓ Você já é Apoiador — todos os recursos abaixo estão liberados.</div>'+
+      renderListaBeneficios();
+    return;
+  }
+  var pedido = await sGet("upgrade-request:"+session.email, true);
+  var pendente = pedido && pedido.status==="pendente";
+  var html = "";
+  if(motivo) html += '<p class="card-lede" style="margin-bottom:10px;">'+esc(motivo)+'</p>';
+  if(PRECO_PLANO_TEXTO) html += '<p class="plan-price">'+esc(PRECO_PLANO_TEXTO)+'</p>';
+  html += renderListaBeneficios();
+  if(pendente){
+    html += '<div class="plan-pending-badge">⏳ Recebemos seu aviso de pagamento em '+
+      new Date(pedido.criadoEm).toLocaleDateString("pt-BR")+' — aguardando confirmação do administrador.</div>';
+  } else {
+    var metodos = "";
+    if(PAGAMENTO_PIX_CHAVE){
+      metodos += '<div class="pay-method"><span class="pm-icon">💠</span><div class="pm-info">'+
+        '<b>Pix'+(PAGAMENTO_PIX_NOME?" — "+esc(PAGAMENTO_PIX_NOME):"")+'</b>'+
+        '<span id="upgrade-pix-chave">'+esc(PAGAMENTO_PIX_CHAVE)+'</span></div>'+
+        '<button type="button" class="ghost-btn" id="upgrade-pix-copiar" style="flex-shrink:0;">Copiar</button></div>';
+    }
+    if(PAGAMENTO_LINK_CARTAO){
+      metodos += '<a class="pay-method" href="'+esc(PAGAMENTO_LINK_CARTAO)+'" target="_blank" rel="noopener" id="upgrade-link-cartao">'+
+        '<span class="pm-icon">💳</span><div class="pm-info"><b>Cartão / outros meios</b><span>Abre uma página de pagamento segura</span></div></a>';
+    }
+    if(!metodos){
+      metodos = '<p class="modal-note">Nenhum meio de pagamento configurado ainda — fale diretamente com o administrador.</p>';
+    }
+    html += metodos;
+    html += '<div class="card-actions" style="margin-top:14px;">'+
+      '<button type="button" class="primary-btn" id="upgrade-ja-paguei">Já paguei — avisar o administrador</button></div>';
+  }
+  body.innerHTML = html;
+  var pix = el("upgrade-pix-copiar");
+  if(pix) pix.addEventListener("click", function(){
+    var texto = el("upgrade-pix-chave").textContent;
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(texto).then(function(){
+        pix.textContent = "Copiado!"; setTimeout(function(){ pix.textContent = "Copiar"; }, 2000);
+      }).catch(function(){ alert("Chave Pix: "+texto); });
+    } else { alert("Chave Pix: "+texto); }
+  });
+  var linkCartao = el("upgrade-link-cartao");
+  if(linkCartao) linkCartao.addEventListener("click", function(){
+    logAdminEvent("upgrade_link_click", {email:session.email, origem:origem||""});
+  });
+  var jaPaguei = el("upgrade-ja-paguei");
+  if(jaPaguei) jaPaguei.addEventListener("click", async function(){
+    jaPaguei.disabled = true; jaPaguei.textContent = "Enviando…";
+    try{
+      await sSet("upgrade-request:"+session.email, {
+        email:session.email, nome:session.name||"", status:"pendente",
+        origem:origem||"", criadoEm:Date.now()
+      }, true);
+      logAdminEvent("upgrade_requested", {email:session.email, origem:origem||""});
+      renderUpgradeBody(origem);
+    }catch(err){
+      alert("Não foi possível enviar o aviso agora: "+err.message+"\n\nTente de novo em instantes.");
+      jaPaguei.disabled = false; jaPaguei.textContent = "Já paguei — avisar o administrador";
+    }
+  });
+}
+function renderListaBeneficios(){
+  return '<ul class="plan-benefits">'+
+    '<li>Aventuras simultâneas ilimitadas (grátis: '+LIMITE_AVENTURAS_ATIVAS+')</li>'+
+    '<li>Produção de itens na Oficina</li>'+
+    '<li>Exportação da crônica da aventura em PDF</li>'+
+    '<li>Histórico completo de aventuras concluídas (grátis: últimas '+LIMITE_ARQUIVO_GRATUITO+')</li>'+
+    '</ul>';
+}
+el("upgrade-close").addEventListener("click", function(){ el("upgrade-overlay").classList.add("hidden"); });
+el("upgrade-overlay").addEventListener("click", function(e){ if(e.target===el("upgrade-overlay")) el("upgrade-overlay").classList.add("hidden"); });
+el("hub-upgrade").addEventListener("click", function(){ abrirUpgrade(); });
 
 /* Conta o que ocupa "vaga" do jogador: em andamento, pausada ou em lobby */
 function ocupaVaga(adv){
@@ -4349,6 +4569,15 @@ function categoriaDoItem(nome){
   return {chave:"generico", icone:"🎒", rx:null};
 }
 function iconeDoItem(nome){ return categoriaDoItem(nome).icone; }
+/* Nomes amigáveis das categorias, usados no droplist "Tipo de item" da
+   oficina (Fase 6). A classificação em si (categoriaDoItem) já existia
+   e é só regex sobre o nome — decisão do MOTOR, nunca perguntada à IA. */
+var LABEL_CATEGORIA = {
+  pocao:"Poções", pergaminho:"Pergaminhos e tomos", arma:"Armas",
+  armadura:"Armaduras e escudos", anel:"Anéis", amuleto:"Amuletos e talismãs",
+  veste:"Vestes e roupas", ferramenta:"Ferramentas", comida:"Comida e suprimentos",
+  generico:"Outros itens"
+};
 
 var TAXA_MERCADO = 0.05;          // 5% vão para o cofre de prêmios dos eventos globais
 var RARIDADES = ["comum","incomum","raro","lendario"];
@@ -4935,7 +5164,7 @@ function buildForgeSystemPrompt(c){
   var cap = capacidadeOficina(c);
   var permitidas = RARIDADES.slice(0, RARIDADES.indexOf(cap.raridadeMax)+1)
                    .map(function(r){ return LABEL_RARIDADE[r]; }).join(", ");
-  return "Você é um mestre artesão que orienta um aventureiro na oficina. Responda em português do Brasil, no máximo 2 parágrafos curtos, com tom de bancada de trabalho.\n\n"+
+  return "Você é um mestre artesão que orienta um aventureiro na oficina. Responda em português do Brasil, no máximo 2 parágrafos curtos, com tom de bancada de trabalho. Cumprimente e descreva em poucas palavras o que os materiais do inventário sugerem ser possível — NÃO enumere os itens um a um na sua fala, pois o aplicativo já mostra as opções para o jogador escolher por tipo logo abaixo.\n\n"+
   "ARTESÃO: "+(c.nome||"—")+", "+(c.ancestralidade||"")+" "+(c.classe||"")+", nível "+(c.nivel||1)+".\n"+
   "Ofício principal: "+cap.pericia+" ("+cap.posto+", modificador "+fmtMod(cap.mod)+").\n"+
   "Talentos: "+((c.talentos||[]).join(", ")||"nenhum")+".\n"+
@@ -5007,8 +5236,9 @@ function atualizarCabecalhoOficina(){
 }
 
 async function abrirOficina(){
+  await carregarPlanoPago();
   if(!podeProduzirItens(session.email)){
-    alert("A produção de itens é um recurso restrito. Comprar no mercado continua disponível para todos.");
+    abrirUpgrade("oficina");
     return;
   }
   el("forge-overlay").classList.remove("hidden");
@@ -5081,42 +5311,94 @@ function renderCatalogo(cat){
     box.scrollTop = box.scrollHeight;
     return;
   }
-  var html = '<div class="cat-box"><div class="cat-t">O que você consegue produzir agora</div>';
-  // Bug corrigido: cada renderização do catálogo (uma por resposta do
-  // artesão) empilha uma NOVA caixa no histórico do chat, mas antes só
-  // existia UM objeto catalogoAtual compartilhado, reindexado do zero a
-  // cada vez. Um botão "Produzir" de uma caixa antiga ainda visível na
-  // tela acabava lendo o catálogo mais recente na mesma posição — ou
-  // seja, clicar num item antigo podia produzir um item diferente do
-  // que estava escrito no botão. Agora cada geração de catálogo tem seu
-  // próprio namespace, então um botão antigo sempre aponta para o item
-  // que ele realmente mostra, não importa quantos catálogos vieram depois.
+
+  // Bug corrigido: cada renderização do catálogo empilhava uma NOVA caixa
+  // no histórico, mas só existia UM objeto compartilhado guardando "qual
+  // item é a posição 0, 1, 2…", reindexado do zero a cada vez. Uma escolha
+  // feita numa caixa antiga (ainda visível na tela) acabava lendo o
+  // catálogo mais recente na mesma posição — ou seja, produzir por uma
+  // caixa antiga podia fabricar um item diferente do que estava escrito
+  // nela. Agora cada catálogo tem sua própria "geração" isolada, então uma
+  // caixa antiga sempre aponta para os itens exatos que ela mostra, não
+  // importa quantos catálogos vieram depois.
   var geracao = ++catalogGeracaoSeq;
-  catalogosPorGeracao[geracao] = {};
+  var itensGeracao = {};      // idx -> item completo (com cd/horas/custo já calculados)
+  var porCategoria = {};      // chave da categoria -> {icone, itens:[idx,...]}
   viaveis.forEach(function(it, idx){
     var nivel = parseInt(it.nivelItem,10)||1;
     var rar = String(it.raridade||"comum").toLowerCase();
     var cd = cdDeProducao(nivel, rar), horas = horasDeProducao(nivel, rar), custo = custoDeProducao(nivel, rar);
-    catalogosPorGeracao[geracao][idx] = {nome:it.nome, raridade:rar, nivelItem:nivel, descricao:it.descricao||"",
+    itensGeracao[idx] = {nome:it.nome, raridade:rar, nivelItem:nivel, descricao:it.descricao||"",
                           consumiveis:it.consumiveis||[], cd:cd, horas:horas, custo:custo};
-    html += '<div class="cat-item"><div class="ci-h"><b>'+esc(it.nome)+
-      '</b><span class="rar '+esc(rar)+'">'+esc(LABEL_RARIDADE[rar])+'</span></div>'+
-      '<div class="ci-d">'+esc(it.descricao||"")+'</div>'+
-      '<div class="ci-m">Materiais: '+esc((it.consumiveis||[]).join(", ")||"nenhum")+'</div>'+
-      '<div class="ci-s">nível '+nivel+' · CD '+cd+' · '+fmtDuracao(horas)+' · '+fmtMoeda(custo)+
-      ' · vale '+fmtMoeda(precoDoItem(nivel,rar))+'</div>'+
-      '<button class="mk-btn" data-produzir="'+idx+'" data-geracao="'+geracao+'">Produzir</button></div>';
+    var catInfo = categoriaDoItem(it.nome);
+    if(!porCategoria[catInfo.chave]) porCategoria[catInfo.chave] = {icone:catInfo.icone, itens:[]};
+    porCategoria[catInfo.chave].itens.push(idx);
   });
-  html += '</div>';
+  catalogosPorGeracao[geracao] = itensGeracao;
+
+  // Fluxo pedido: o artesão já saudou e leu o que pode ser produzido (a
+  // narrativa acima, no texto normal da mensagem); aqui vem só a ESCOLHA
+  // guiada em duas etapas — tipo (droplist) e, dentro dele, o item
+  // (droplist) — em vez de uma lista longa e solta de botões. Termina
+  // sempre num único botão "Produzir" para o item escolhido.
+  var chavesOrdenadas = Object.keys(porCategoria).sort(function(a,b){
+    return porCategoria[b].itens.length - porCategoria[a].itens.length;
+  });
+  var html = '<div class="cat-box"><div class="cat-t">O que você consegue produzir agora</div>'+
+    '<div class="field"><label>Tipo de item</label>'+
+    '<select class="text-input cat-select-tipo"><option value="">Escolha um tipo…</option>'+
+    chavesOrdenadas.map(function(k){
+      var grupo = porCategoria[k];
+      return '<option value="'+esc(k)+'">'+grupo.icone+' '+esc(LABEL_CATEGORIA[k]||k)+' ('+grupo.itens.length+')</option>';
+    }).join("")+
+    '</select></div>'+
+    '<div class="field hidden cat-item-field"><label>Item</label>'+
+    '<select class="text-input cat-select-item"><option value="">Escolha um item…</option></select></div>'+
+    '<div class="cat-item-detalhe"></div>'+
+    '</div>';
+
   var d = document.createElement("div");
   d.innerHTML = html;
   box.appendChild(d);
   box.scrollTop = box.scrollHeight;
-  d.querySelectorAll("[data-produzir]").forEach(function(b){
-    b.addEventListener("click", function(){
-      var g = catalogosPorGeracao[b.getAttribute("data-geracao")];
-      iniciarProducao(g && g[b.getAttribute("data-produzir")]);
+
+  var selTipo = d.querySelector(".cat-select-tipo");
+  var campoItem = d.querySelector(".cat-item-field");
+  var selItem = d.querySelector(".cat-select-item");
+  var detalhe = d.querySelector(".cat-item-detalhe");
+
+  selTipo.addEventListener("change", function(){
+    detalhe.innerHTML = "";
+    selItem.value = "";
+    var chave = selTipo.value;
+    if(!chave){ campoItem.classList.add("hidden"); return; }
+    var idxs = porCategoria[chave].itens;
+    selItem.innerHTML = '<option value="">Escolha um item…</option>'+
+      idxs.map(function(idx){
+        var it = itensGeracao[idx];
+        return '<option value="'+idx+'">'+esc(it.nome)+' — '+esc(LABEL_RARIDADE[it.raridade])+'</option>';
+      }).join("");
+    campoItem.classList.remove("hidden");
+    box.scrollTop = box.scrollHeight;
+  });
+
+  selItem.addEventListener("change", function(){
+    var idx = selItem.value;
+    if(idx===""){ detalhe.innerHTML = ""; return; }
+    var it = itensGeracao[idx];
+    detalhe.innerHTML =
+      '<div class="cat-item"><div class="ci-h"><b>'+esc(it.nome)+
+      '</b><span class="rar '+esc(it.raridade)+'">'+esc(LABEL_RARIDADE[it.raridade])+'</span></div>'+
+      '<div class="ci-d">'+esc(it.descricao)+'</div>'+
+      '<div class="ci-m">Materiais: '+esc(it.consumiveis.join(", ")||"nenhum")+'</div>'+
+      '<div class="ci-s">nível '+it.nivelItem+' · CD '+it.cd+' · '+fmtDuracao(it.horas)+' · '+fmtMoeda(it.custo)+
+      ' · vale '+fmtMoeda(precoDoItem(it.nivelItem,it.raridade))+'</div>'+
+      '<button class="mk-btn" data-geracao="'+geracao+'" data-produzir="'+idx+'">Produzir</button></div>';
+    detalhe.querySelector("[data-produzir]").addEventListener("click", function(){
+      var g = catalogosPorGeracao[geracao];
+      iniciarProducao(g && g[idx]);
     });
+    box.scrollTop = box.scrollHeight;
   });
 }
 
@@ -5220,15 +5502,22 @@ async function enviarMensagemOficina(texto, opts){
   forgeMessages.push({role:"user", text:texto, display:opts.display!==false});
   forgeLoading = true; renderForgeChat();
   el("forge-send").disabled = true;
+  // Bug corrigido: o catálogo era anexado à tela e, alguns milissegundos
+  // depois, o renderForgeChat() do "finally" reconstruía TODO o HTML do
+  // chat a partir de forgeMessages — apagando a caixa do catálogo que
+  // tinha acabado de aparecer (o catálogo não faz parte de forgeMessages,
+  // é um elemento à parte). Por isso guardamos o catálogo numa variável e
+  // só o renderizamos depois que o chat termina de se redesenhar, nunca
+  // antes.
+  var catalogoParaRenderizar = null;
   try{
     var contents = forgeMessages.filter(function(m){ return !m.kind; })
                                 .map(function(m){ return {role:m.role, parts:[{text:m.text}]}; });
     var raw = await callGeminiRaw(buildForgeSystemPrompt(character), contents);
     var ext = extractBlock(raw);
     forgeMessages.push({role:"model", text: ext.clean || "(o artesão fica em silêncio…)", display:true});
-    renderForgeChat();
     if(ext.data && ext.data.catalogo){
-      renderCatalogo(ext.data.catalogo);
+      catalogoParaRenderizar = ext.data.catalogo;
       ultimoCatalogoOficina = ext.data.catalogo;
       pediuCatalogo = false;
     } else if(!pediuCatalogo){
@@ -5247,6 +5536,10 @@ async function enviarMensagemOficina(texto, opts){
     await sSet("forge-chat:"+session.email, {messages:forgeMessages, catalogo:ultimoCatalogoOficina}, true);
     atualizarCabecalhoOficina();
     renderForgeChat();
+    // Sempre por último: o catálogo (se houver) é a etapa "tipo → item →
+    // produzir" recomeçando do zero, igual toda vez que o artesão propõe
+    // opções novas.
+    if(catalogoParaRenderizar) renderCatalogo(catalogoParaRenderizar);
   }
 }
 
@@ -5410,6 +5703,10 @@ async function renderMercado(){
       h += '<div class="adm-section"><h4>Oficina</h4>'+
            '<p class="modal-note">Produza um item novo para vender no mercado.</p>'+
            '<button class="mk-btn" id="mk-forge" style="width:100%;padding:11px;">Produzir item</button></div>';
+    } else {
+      h += '<div class="adm-section"><h4>Oficina</h4>'+
+           '<p class="modal-note">Produzir seus próprios itens para vender é um recurso do Plano Apoiador.</p>'+
+           '<button class="mk-btn sec" id="mk-forge-upgrade" style="width:100%;padding:11px;">Ver Plano Apoiador</button></div>';
     }
     if(session.email===ADMIN_EMAIL){
       var cofre = await sGet("market-treasury", true) || {total:0, transacoes:0};
@@ -5421,6 +5718,8 @@ async function renderMercado(){
     body.innerHTML = h;
     var fb2 = el("mk-forge");
     if(fb2) fb2.addEventListener("click", abrirOficina);
+    var fb2u = el("mk-forge-upgrade");
+    if(fb2u) fb2u.addEventListener("click", function(){ abrirUpgrade("oficina"); });
     body.querySelectorAll("[data-anunciar]").forEach(function(b){
       b.addEventListener("click", async function(){
         b.disabled=true;
@@ -6053,10 +6352,15 @@ async function openAdmin(){
   try{
     var userKeys = await sList("pub:", true);
     var advKeys = await sList("adv:", true);
+    var upgradeKeys = await sList("upgrade-request:", true);
+    var upgradeReqs = (await Promise.all(upgradeKeys.map(function(k){ return sGet(k, true); }))).filter(Boolean);
     var users = (await Promise.all(userKeys.map(function(k){ return sGet(k, true); }))).filter(Boolean);
     var advs = (await Promise.all(advKeys.map(function(k){ return sGet(k, true); }))).filter(Boolean);
     var chars = (await Promise.all(users.map(function(u){
       return sGet("character:"+u.email, true).then(function(c){ return {email:u.email, c:c}; });
+    })));
+    var subs = (await Promise.all(users.map(function(u){
+      return sGet("subscription:"+u.email, true).then(function(s){ return {email:u.email, s:s}; });
     })));
 
     // message volume per adventure (parallel, one read per scene)
@@ -6218,6 +6522,33 @@ async function openAdmin(){
     }
     html += '</div>';
 
+    /* ===== solicitações de upgrade (Plano Apoiador) ===== */
+    var pendentes = upgradeReqs.filter(function(r){ return r.status==="pendente"; })
+      .sort(function(a,b){ return (a.criadoEm||0)-(b.criadoEm||0); });
+    html += '<div class="adm-section"><h4>Solicitações de upgrade ('+pendentes.length+')</h4>';
+    if(!pendentes.length){
+      html += '<p class="modal-note">Nenhuma solicitação pendente.</p>';
+    } else {
+      html += '<p class="adm-note">Confira o pagamento no seu Pix/processador antes de aprovar — a aprovação libera o Plano Apoiador para o e-mail imediatamente.</p><div class="adm-list">';
+      pendentes.forEach(function(r){
+        html += '<div class="party-row" style="border-color:var(--line-soft);">'+
+          '<span class="pv" style="background:var(--brass-dim);"></span>'+
+          '<span class="pn"><b style="color:var(--text-hi)">'+esc(r.nome||r.email)+'</b>'+
+          '<span style="color:var(--text-faint)">'+esc(r.email)+' · pedido em '+
+          new Date(r.criadoEm).toLocaleDateString("pt-BR")+(r.origem?(" · via "+esc(r.origem)):"")+'</span></span>'+
+          '<button class="mk-btn" data-aprovar-upgrade="'+esc(r.email)+'" style="padding:6px 10px;font-size:11px;">Aprovar</button>'+
+          '<button class="mk-btn sec" data-recusar-upgrade="'+esc(r.email)+'" style="padding:6px 10px;font-size:11px;">Recusar</button>'+
+          '</div>';
+      });
+      html += '</div>';
+    }
+    html += '<div class="input-with-btn" style="margin-top:12px;">'+
+      '<input type="email" id="admin-upgrade-email" class="text-input" placeholder="e-mail para conceder/revogar manualmente">'+
+      '<button type="button" class="ghost-btn" id="admin-upgrade-conceder">Conceder</button>'+
+      '<button type="button" class="ghost-btn" id="admin-upgrade-revogar">Revogar</button></div>'+
+      '<p class="hint">Use isto para casos fora do fluxo normal (ex.: pagamento combinado por fora, cortesia, correção).</p>';
+    html += '</div>';
+
     /* ===== usuários ===== */
     html += '<div class="adm-section"><h4>Usuários ('+users.length+')</h4>';
     if(!users.length) html += '<p class="modal-note">Nenhum usuário ainda.</p>';
@@ -6226,10 +6557,12 @@ async function openAdmin(){
       html += '<div class="adm-list">';
       ordered.forEach(function(u){
         var ch = (chars.filter(function(x){ return x.email===u.email; })[0]||{}).c;
+        var subEntry = (subs.filter(function(x){ return x.email===u.email; })[0]||{}).s;
+        var ehApoiador = u.email===ADMIN_EMAIL || !!(subEntry && subEntry.ativo && (!subEntry.expiraEm || subEntry.expiraEm>Date.now()));
         var nAdv = advByUser[u.email]||0;
         html += '<div class="party-row" style="border-color:var(--line-soft);">'+
           '<span class="pv" style="background:'+(ch&&ch.nome?"var(--arcane)":"var(--text-faint)")+';"></span>'+
-          '<span class="pn"><b style="color:var(--text-hi)">'+esc(u.name||u.email)+'</b>'+
+          '<span class="pn"><b style="color:var(--text-hi)">'+esc(u.name||u.email)+(ehApoiador?' <span title="Apoiador" style="color:var(--brass-bright)">★</span>':'')+'</b>'+
           '<span style="color:var(--text-faint)">'+esc(u.email)+' · '+
           (ch&&ch.nome ? esc(ch.nome)+" nv."+(ch.nivel||1) : "sem personagem")+' · '+nAdv+' aventura(s)</span></span>'+
           (ch&&ch.nome ? '<button class="mk-btn sec" data-editar-ficha="'+esc(u.email)+'" style="padding:6px 10px;font-size:11px;">Editar ficha</button>' : '')+
@@ -6254,6 +6587,37 @@ async function openAdmin(){
     el("admin-body").innerHTML = html;
     el("admin-body").querySelectorAll("[data-editar-ficha]").forEach(function(b){
       b.addEventListener("click", function(){ abrirEditorFicha(b.getAttribute("data-editar-ficha")); });
+    });
+    el("admin-body").querySelectorAll("[data-aprovar-upgrade]").forEach(function(b){
+      b.addEventListener("click", async function(){
+        var email = b.getAttribute("data-aprovar-upgrade");
+        b.disabled = true; b.textContent = "Aprovando…";
+        try{ await concederPlanoPago(email); await sSet("upgrade-request:"+email, {email:email, status:"aprovado", resolvidoEm:Date.now(), resolvidoPor:session.email}, true); openAdmin(); }
+        catch(err){ alert("Falha ao aprovar: "+err.message); b.disabled=false; b.textContent="Aprovar"; }
+      });
+    });
+    el("admin-body").querySelectorAll("[data-recusar-upgrade]").forEach(function(b){
+      b.addEventListener("click", async function(){
+        var email = b.getAttribute("data-recusar-upgrade");
+        if(!confirm("Recusar a solicitação de "+email+"?")) return;
+        b.disabled = true;
+        try{ await sSet("upgrade-request:"+email, {email:email, status:"recusado", resolvidoEm:Date.now(), resolvidoPor:session.email}, true); openAdmin(); }
+        catch(err){ alert("Falha ao recusar: "+err.message); b.disabled=false; }
+      });
+    });
+    var concederBtn = el("admin-upgrade-conceder"), revogarBtn = el("admin-upgrade-revogar");
+    if(concederBtn) concederBtn.addEventListener("click", async function(){
+      var email = normEmail(el("admin-upgrade-email").value);
+      if(!email){ alert("Informe um e-mail."); return; }
+      try{ await concederPlanoPago(email); alert("Plano Apoiador concedido a "+email+"."); openAdmin(); }
+      catch(err){ alert("Falha ao conceder: "+err.message); }
+    });
+    if(revogarBtn) revogarBtn.addEventListener("click", async function(){
+      var email = normEmail(el("admin-upgrade-email").value);
+      if(!email){ alert("Informe um e-mail."); return; }
+      if(!confirm("Revogar o Plano Apoiador de "+email+"?")) return;
+      try{ await sSet("subscription:"+email, {email:email, ativo:false, revogadoEm:Date.now(), revogadoPor:session.email}, true); alert("Plano revogado para "+email+"."); openAdmin(); }
+      catch(err){ alert("Falha ao revogar: "+err.message); }
     });
     var migBtn = el("admin-migrar");
     if(migBtn) migBtn.addEventListener("click", async function(){
@@ -6432,7 +6796,7 @@ async function gatherAdventureTranscript(advId, adv){
 }
 
 function exportBloqueado(){
-  alert("A exportacao e um recurso do plano pago.\n\nSua aventura continua salva e pode ser lida a qualquer momento.");
+  abrirUpgrade("exportacao");
 }
 el("btn-sheet-pdf").addEventListener("click", async function(){
   if(!podeExportar(session.email)) return exportBloqueado();
@@ -6762,6 +7126,7 @@ el("sc-manual").addEventListener("keydown", function(e){
  BOOT
  ========================================================= */
 async function boot2AfterAuth(){
+ await carregarPlanoPago();
  character = await sGet("character:"+session.email, true);
  if(character && character.nome) enterHub();
  else { character = character || JSON.parse(JSON.stringify(EMPTY_CHARACTER)); enterCreation(); }
