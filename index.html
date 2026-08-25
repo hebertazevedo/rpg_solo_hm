@@ -42,7 +42,7 @@ if (window.__fbPending) {
       onAuthStateChanged: auth.onAuthStateChanged,
       doc: fs.doc, getDoc: fs.getDoc, setDoc: fs.setDoc, deleteDoc: fs.deleteDoc,
       collection: fs.collection, getDocs: fs.getDocs, query: fs.query, where: fs.where,
-      onSnapshot: fs.onSnapshot
+      onSnapshot: fs.onSnapshot, runTransaction: fs.runTransaction
     };
     window.__fbStage = "4-pronto";
     console.info("Firebase pronto:", window.FIREBASE_CONFIG.projectId);
@@ -267,7 +267,12 @@ a{color:var(--arcane-bright);}
 .turno-pill{font-size:11px;padding:5px 11px;border-radius:999px;background:var(--void-3);border:1px solid var(--line);color:var(--text-faint);}
 .mission-bar{padding:8px 14px;margin:0 14px 8px;background:var(--void-2);border:1px solid var(--line);border-left:3px solid var(--brass-dim);border-radius:9px;}
 .mission-row{display:flex;align-items:flex-start;gap:8px;}
-.mission-glyph{font-size:14px;line-height:1.4;flex-shrink:0;}
+.mission-glyph{font-size:14px;line-height:1.4;flex-shrink:0;position:relative;}
+.mission-status-dot{position:absolute;right:-3px;bottom:0;width:7px;height:7px;border-radius:50%;background:var(--brass-dim);border:1px solid var(--void-2);}
+.npc-chip{display:inline-block;padding:1px 6px;border-radius:999px;font-size:10px;font-weight:600;background:var(--void-3);border:1px solid var(--line);color:var(--text-hi);}
+.npc-chip.aliada{border-color:#4caf6f;color:#8fe0a8;}
+.npc-chip.hostil{border-color:#d9534f;color:#f0a8a8;}
+.npc-chip.neutra{border-color:var(--brass-dim);color:var(--brass-bright);}
 .mission-text{min-width:0;display:flex;flex-direction:column;gap:1px;flex:1;}
 .mission-text b{font-size:12.5px;color:var(--text-hi);font-weight:600;}
 .mission-text span{font-size:11px;color:var(--text-lo);}
@@ -832,12 +837,12 @@ a{color:var(--arcane-bright);}
  </div>
  <div id="mission-bar" class="mission-bar hidden">
    <div class="mission-row" id="mission-row">
-     <span class="mission-glyph">🎯</span>
+     <span class="mission-glyph">🎯<span id="mission-glyph-dot" class="mission-status-dot"></span></span>
      <div class="mission-text">
        <b id="mission-objetivo"></b>
        <span id="mission-proximo"></span>
      </div>
-     <button type="button" class="mission-toggle hidden" id="mission-toggle" aria-label="Ver ganchos ativos">▾</button>
+     <button type="button" class="mission-toggle hidden" id="mission-toggle" aria-label="Ver ganchos e NPCs">▾</button>
    </div>
    <ul id="mission-ganchos" class="mission-ganchos hidden"></ul>
  </div>
@@ -1276,6 +1281,55 @@ async function fsPut(key, value){
     return true;
   }catch(e){ console.warn("Firestore put falhou ("+key+"):", e.message); return false; }
 }
+
+/* =========================================================
+   TRANSAÇÕES (P0 da auditoria — "operações transacionais")
+   Várias rotinas do jogo faziam "ler → alterar em memória → gravar" em
+   passos separados (contador de eventos, lock de geração do Mestre,
+   compra no mercado, cofre). Isso é uma corrida clássica: se dois
+   pedidos chegarem quase juntos, os dois leem o mesmo valor antigo, os
+   dois gravam a partir dele, e um dos incrementos/mudanças some sem
+   erro nenhum — exatamente o que a auditoria descreveu em "Problema
+   crítico nº 3" (Event Log) e "nº 4" (lock do Mestre).
+   fsTransactionUpdate() usa runTransaction() do Firestore: lê todas as
+   chaves envolvidas, monta o novo valor, e só grava se NENHUMA delas
+   mudou entre a leitura e a escrita — senão o Firestore automaticamente
+   tenta de novo do zero (com um novo `atual`), várias vezes, até
+   conseguir. É a correção "de verdade" (não é uma fila local nem uma
+   reconciliação a posteriori — é o próprio banco garantindo atomicidade).
+   Só funciona com Firestore ativo (não existe equivalente no fallback de
+   Sheets); nesse caso raríssimo, quem chamar decide o que fazer.
+   ========================================================= */
+async function fsTransactionUpdate(keys, updater){
+  var fb = window.__fb;
+  if(!fbReady() || !fb.runTransaction) throw new Error("Firestore indisponível para operação transacional.");
+  var refs = {};
+  keys.forEach(function(k){ refs[k] = fb.doc(fb.db, "kv", docIdFor(k)); });
+  var writes = await fb.runTransaction(fb.db, async function(tx){
+    // Firestore exige TODAS as leituras antes de QUALQUER escrita na mesma transação.
+    var atual = {};
+    for(var i=0;i<keys.length;i++){
+      var k = keys[i];
+      var snap = await tx.get(refs[k]);
+      if(!snap.exists()) { atual[k] = null; continue; }
+      var d = snap.data();
+      atual[k] = (d && typeof d.json==="string") ? (function(){ try{ return JSON.parse(d.json); }catch(e){ return null; } })() : null;
+    }
+    var out = await updater(atual);
+    Object.keys(out||{}).forEach(function(k){
+      if(refs[k]===undefined) throw new Error("fsTransactionUpdate: chave '"+k+"' não estava na lista de leitura.");
+      var val = out[k];
+      if(val===null || val===undefined){ tx.delete(refs[k]); return; }
+      tx.set(refs[k], { json: JSON.stringify(val), key:k, updatedAt: Date.now(), owner: ownerForKey(k) });
+    });
+    return out;
+  });
+  // o cache local pode estar com um valor pré-transação; invalida pra
+  // garantir que a próxima leitura pegue o resultado real gravado.
+  keys.forEach(function(k){ cacheInvalidate(k); });
+  return writes;
+}
+
 /* ---------------------------------------------------------
    LISTENERS EM TEMPO REAL
    O polling perguntava ao servidor a cada 4s, gastando ~3.600
@@ -2096,11 +2150,11 @@ FICHA_START+"\n{ ...JSON... }\n"+FICHA_END+"\n\n" +
 ' "magiasPerdidas": [{"email": string, "magias": [string]}],\n'+
 ' "periciasTreinadas": [{"email": string, "pericias": [{"nome": string, "posto": "treinado"|"especialista"|"mestre"|"lendario"}]}],\n'+
 ' "eventos": [{"tipo": "COMBATE_FINALIZADO", "inimigosDerrotados": number}],\n'+
-' "estadoNarrativo": {"objetivo": string|null, "proximoPasso": string|null, "ganchosAtivos": [string]}\n'+
+' "estadoNarrativo": {"objetivo": string|null, "proximoPasso": string|null, "ganchosAtivos": [string], "missaoStatus": "ativa"|"concluida"|"falhou"|"abandonada", "npcs": [{"nome": string, "relacao": "aliada"|"neutra"|"hostil"|"desconhecida", "estado": "viva"|"morta"|"desaparecida"}]}\n'+
 "}\n\n" +
 (isGroup
  ? "Regras críticas: 1) \"cenas\" deve sempre listar TODOS os jogadores confirmados da aventura, cada um em exatamente uma cena — nunca esqueça ninguém. 2) \"fichas\" deve sempre incluir a ficha atual de TODOS os membros da cena ativa (mesmo sem mudanças), com \"experiencia\" refletindo o total acumulado. "
- : "Regras críticas: 1) Não existem cenas nem outros jogadores nesta aventura. 2) \"fichas\" deve conter a ficha atual do jogador (mesmo sem mudanças), com \"experiencia\" refletindo o total acumulado. ") + "3) NUNCA altere a identidade de um personagem: nome, ancestralidade, linhagem, antecedente e classe são definidos pelo jogador na criação e devem ser repetidos exatamente como estão. Se você não souber o valor de um campo, repita o valor anterior em vez de inventar ou deixar em branco. Nunca reduza o nível nem a experiência de um personagem. 4) INVENTÁRIO, MAGIAS E PERÍCIAS: o aplicativo controla as listas \"equipamento\", \"magias\" e \"pericias\" — o que você escrever nesses arrays é IGNORADO. Os modificadores de perícia são calculados automaticamente pelo aplicativo (nível + proficiência + atributo); NUNCA calcule, informe ou corrija modificadores, e nunca repita a ficha no chat. Para treinar o personagem numa perícia nova ou elevar seu posto, use \"periciasTreinadas\". Para dar ou tirar um item, ou ensinar/remover uma magia, use exclusivamente \"itensGanhos\", \"itensPerdidos\", \"magiasAprendidas\" e \"magiasPerdidas\", listando apenas o que mudou NESTE turno (arrays vazios quando nada mudou). Nunca remova algo do inventário do jogador sem um motivo narrado explicitamente na cena. 5) \"xpConcedido\" lista apenas o XP ganho NESTE turno (array vazio quando não houve ganho). 6) \"eventos\": toda vez que um combate desta cena terminar NESTE turno (todos os inimigos derrotados, fugiram ou se renderam), inclua um item {\"tipo\":\"COMBATE_FINALIZADO\",\"inimigosDerrotados\":N} com a contagem exata de inimigos derrotados nesse combate (0 se ninguém morreu, ex.: fuga ou rendição). Não repita esse evento em turnos seguintes do mesmo combate, nem invente combates que não aconteceram. Nunca inclua eventos de outro tipo — críticos e falhas são controlados pelo próprio aplicativo, não pela narrativa. Array vazio quando não houve conclusão de combate neste turno. 7) \"estadoNarrativo\": mantenha sempre atualizado o objetivo atual da aventura (\"objetivo\", uma frase curta, ex.: \"Descobrir quem sabotou as caravanas\"), o próximo passo sugerido (\"proximoPasso\", ex.: \"Falar com o ferreiro sobre as marcas na ferradura\") e uma lista curta de ganchos de história ainda em aberto (\"ganchosAtivos\", no máximo 5 frases curtas). Repita os mesmos valores em turnos onde nada mudou; atualize \"objetivo\" só quando a missão principal genuinamente mudar, e \"proximoPasso\" a cada vez que a situação avançar. Isso é usado pelo aplicativo para lembrar o jogador onde parou, então nunca deixe em branco depois do primeiro turno da aventura. 8) O bloco deve conter apenas JSON válido, uma única vez, sempre ao final.";
+ : "Regras críticas: 1) Não existem cenas nem outros jogadores nesta aventura. 2) \"fichas\" deve conter a ficha atual do jogador (mesmo sem mudanças), com \"experiencia\" refletindo o total acumulado. ") + "3) NUNCA altere a identidade de um personagem: nome, ancestralidade, linhagem, antecedente e classe são definidos pelo jogador na criação e devem ser repetidos exatamente como estão. Se você não souber o valor de um campo, repita o valor anterior em vez de inventar ou deixar em branco. Nunca reduza o nível nem a experiência de um personagem. 4) INVENTÁRIO, MAGIAS E PERÍCIAS: o aplicativo controla as listas \"equipamento\", \"magias\" e \"pericias\" — o que você escrever nesses arrays é IGNORADO. Os modificadores de perícia são calculados automaticamente pelo aplicativo (nível + proficiência + atributo); NUNCA calcule, informe ou corrija modificadores, e nunca repita a ficha no chat. Para treinar o personagem numa perícia nova ou elevar seu posto, use \"periciasTreinadas\". Para dar ou tirar um item, ou ensinar/remover uma magia, use exclusivamente \"itensGanhos\", \"itensPerdidos\", \"magiasAprendidas\" e \"magiasPerdidas\", listando apenas o que mudou NESTE turno (arrays vazios quando nada mudou). Nunca remova algo do inventário do jogador sem um motivo narrado explicitamente na cena. 5) \"xpConcedido\" lista apenas o XP ganho NESTE turno (array vazio quando não houve ganho). 6) \"eventos\": toda vez que um combate desta cena terminar NESTE turno (todos os inimigos derrotados, fugiram ou se renderam), inclua um item {\"tipo\":\"COMBATE_FINALIZADO\",\"inimigosDerrotados\":N} com a contagem exata de inimigos derrotados nesse combate (0 se ninguém morreu, ex.: fuga ou rendição). Não repita esse evento em turnos seguintes do mesmo combate, nem invente combates que não aconteceram. Nunca inclua eventos de outro tipo — críticos e falhas são controlados pelo próprio aplicativo, não pela narrativa. Array vazio quando não houve conclusão de combate neste turno. 7) \"estadoNarrativo\": mantenha sempre atualizado o objetivo atual da aventura (\"objetivo\", uma frase curta, ex.: \"Descobrir quem sabotou as caravanas\"), o próximo passo sugerido (\"proximoPasso\", ex.: \"Falar com o ferreiro sobre as marcas na ferradura\") e uma lista curta de ganchos de história ainda em aberto (\"ganchosAtivos\", no máximo 5 frases curtas). Repita os mesmos valores em turnos onde nada mudou; atualize \"objetivo\" só quando a missão principal genuinamente mudar, e \"proximoPasso\" a cada vez que a situação avançar. \"missaoStatus\" deve ser \"ativa\" na maior parte do jogo, e só virar \"concluida\", \"falhou\" ou \"abandonada\" quando isso genuinamente acontecer na narrativa (depois disso, se surgir um novo objetivo, volte a \"ativa\" com um novo \"objetivo\"). \"npcs\" é uma lista curta (no máximo 8) dos NPCs importantes já conhecidos pelo jogador nesta aventura, cada um com nome, relação com o jogador e se ainda está vivo — repita a lista inteira a cada turno, atualizando só quem de fato mudou. Isso é usado pelo aplicativo para lembrar o jogador onde parou, então nunca deixe em branco depois do primeiro turno da aventura. 8) O bloco deve conter apenas JSON válido, uma única vez, sempre ao final.";
 }
 
 function buildCreationSystemPrompt(){
@@ -3240,32 +3294,91 @@ function contarInimigosDerrotadosRegex(msgs){
  EVENT LOG ESTRUTURADO (Fase 1)
  Um documento por aventura, guardando contadores agregados e uma lista
  curta (até EVENT_LOG_MAX) dos últimos eventos — o suficiente para
- estatísticas confiáveis e para uma futura linha do tempo, sem crescer
- sem limite. Isto é o primeiro degrau do "Event Log" completo descrito
- no roadmap (seção 22 da auditoria); uma versão futura pode expandir
- para um registro por evento em vez de contadores agregados.
- ========================================================= */
-var EVENT_LOG_MAX = 200;
+ estatísticas confiáveis e para uma linha do tempo, sem crescer sem
+ limite.
+ Fase P1 (nova auditoria, "Event Log ainda não é realmente um Event
+ Log"): o vocabulário de eventos foi ampliado bem além de combate e
+ rolagens. A maioria dos tipos novos (XP, item, magia, descanso, nível,
+ troca de cena) NÃO depende da IA declarar nada em "eventos" — eles são
+ emitidos pelo próprio app a partir de dados que ele já calcula e
+ confia (itensGanhos/itensPerdidos, xpConcedido, o nível recém-calculado,
+ etc.), a mesma filosofia da Fase 1 ("motor decide o estado"). Só
+ COMBATE_FINALIZADO, TESTE_CRITICO, TESTE_FALHA_CRITICA e
+ MISSAO_STATUS_MUDOU continuam vindo de fora (o primeiro da IA,
+ validado; os dois de rolagem; o último de uma mudança em
+ estadoNarrativo.missaoStatus que o app detecta comparando com o valor
+ anterior — nunca aplicado sem essa comparação). ========================================================= */
+var EVENT_LOG_MAX = 300;
 var TIPOS_EVENTO_VALIDOS = {
   "COMBATE_FINALIZADO": true,
   "TESTE_CRITICO": true,
-  "TESTE_FALHA_CRITICA": true
+  "TESTE_FALHA_CRITICA": true,
+  "XP_GANHO": true,
+  "NIVEL_ALCANCADO": true,
+  "ITEM_GANHO": true,
+  "ITEM_PERDIDO": true,
+  "MAGIA_APRENDIDA": true,
+  "DESCANSO": true,
+  "CENA_MUDOU": true,
+  "MISSAO_STATUS_MUDOU": true,
+  "NPC_INTRODUZIDO": true
 };
 function eventLogVazio(){
-  return { inimigosDerrotados:0, combatesFinalizados:0, criticos:0, falhasCriticas:0, eventos:[], updatedAt:Date.now() };
+  return {
+    inimigosDerrotados:0, combatesFinalizados:0, criticos:0, falhasCriticas:0,
+    xpTotal:0, itensGanhos:0, itensPerdidos:0, magiasAprendidas:0,
+    descansos:0, niveisAlcancados:0,
+    eventos:[], updatedAt:Date.now()
+  };
 }
 async function carregarEventLog(advId){
   var log = await sGet("event-log:"+advId, true);
-  return (log && typeof log==="object") ? log : eventLogVazio();
+  if(!log || typeof log!=="object") return eventLogVazio();
+  // compatibilidade: logs criados antes desta expansão não têm os
+  // contadores novos — preenche com 0 em vez de deixar undefined.
+  var base = eventLogVazio();
+  Object.keys(base).forEach(function(k){ if(typeof log[k]==="undefined") log[k] = base[k]; });
+  return log;
 }
 /* events: array de {tipo, ...payload}. Só tipos conhecidos são aceitos —
-   o motor VALIDA o que a IA (ou a rolagem local) declara, não confia cegamente. */
+   o motor VALIDA o que a IA (ou a rolagem local) declara, não confia cegamente.
+   Bug real corrigido (auditoria, "Problema crítico nº 3"): antes isto era
+   ler → somar em memória → gravar em passos separados. Se dois jogadores
+   (ou duas abas) tiravam um crítico quase ao mesmo tempo, os dois liam o
+   mesmo contador antigo e um dos incrementos desaparecia sem erro nenhum.
+   Agora roda dentro de uma transação do Firestore: a leitura e a escrita
+   deste documento são atômicas, e o próprio banco reexecuta a função com
+   o valor mais novo se detectar que alguém escreveu no meio do caminho. */
 async function registrarEventos(advId, sceneId, events, origem){
   var validos = (events||[]).filter(function(e){ return e && TIPOS_EVENTO_VALIDOS[e.tipo]; });
   if(!validos.length) return null;
-  var log = await carregarEventLog(advId);
+  var key = "event-log:"+advId;
+  if(!fbReady()){
+    // Sem Firestore ativo não existe transação real disponível — cai para
+    // o comportamento anterior (ainda com o risco documentado), só para
+    // não travar o turno numa sessão sem backend configurado.
+    var log = await carregarEventLog(advId);
+    aplicarEventosNoLog(log, validos, sceneId, origem);
+    await sSet(key, log, true);
+    return log;
+  }
+  var out = await fsTransactionUpdate([key], function(atual){
+    var log = (atual[key] && typeof atual[key]==="object") ? atual[key] : eventLogVazio();
+    var base = eventLogVazio();
+    Object.keys(base).forEach(function(k){ if(typeof log[k]==="undefined") log[k] = base[k]; });
+    aplicarEventosNoLog(log, validos, sceneId, origem);
+    var w = {}; w[key] = log;
+    return w;
+  });
+  return out[key];
+}
+/* Aplica os eventos já validados num objeto de log existente, em memória
+   — extraído à parte para ser reaproveitado tanto pelo caminho
+   transacional quanto pelo fallback sem Firestore, sem duplicar a lógica. */
+function aplicarEventosNoLog(log, validos, sceneId, origem){
   validos.forEach(function(e){
     var entry = { ts:Date.now(), sceneId:sceneId||null, tipo:e.tipo, origem:origem||"ia" };
+    if(e.email) entry.email = normEmail(e.email);
     if(e.tipo==="COMBATE_FINALIZADO"){
       var n = Math.max(0, Math.min(50, parseInt(e.inimigosDerrotados,10)||0)); // sanidade: nunca negativo nem absurdo
       log.inimigosDerrotados += n;
@@ -3275,13 +3388,38 @@ async function registrarEventos(advId, sceneId, events, origem){
       log.criticos += 1;
     } else if(e.tipo==="TESTE_FALHA_CRITICA"){
       log.falhasCriticas += 1;
+    } else if(e.tipo==="XP_GANHO"){
+      var xp = Math.max(0, Math.min(500, parseInt(e.quantidade,10)||0));
+      log.xpTotal += xp;
+      entry.quantidade = xp;
+      if(e.motivo) entry.motivo = String(e.motivo).slice(0,120);
+    } else if(e.tipo==="NIVEL_ALCANCADO"){
+      log.niveisAlcancados += 1;
+      entry.nivel = Math.max(1, Math.min(999, parseInt(e.nivel,10)||1));
+    } else if(e.tipo==="ITEM_GANHO"){
+      log.itensGanhos += 1;
+      entry.nome = String(e.nome||"").slice(0,120);
+    } else if(e.tipo==="ITEM_PERDIDO"){
+      log.itensPerdidos += 1;
+      entry.nome = String(e.nome||"").slice(0,120);
+    } else if(e.tipo==="MAGIA_APRENDIDA"){
+      log.magiasAprendidas += 1;
+      entry.nome = String(e.nome||"").slice(0,120);
+    } else if(e.tipo==="DESCANSO"){
+      log.descansos += 1;
+    } else if(e.tipo==="CENA_MUDOU"){
+      entry.de = String(e.de||"").slice(0,80);
+      entry.para = String(e.para||"").slice(0,80);
+    } else if(e.tipo==="MISSAO_STATUS_MUDOU"){
+      entry.de = String(e.de||"").slice(0,40);
+      entry.para = String(e.para||"").slice(0,40);
+    } else if(e.tipo==="NPC_INTRODUZIDO"){
+      entry.nome = String(e.nome||"").slice(0,80);
     }
     log.eventos.push(entry);
   });
   if(log.eventos.length>EVENT_LOG_MAX) log.eventos = log.eventos.slice(-EVENT_LOG_MAX);
   log.updatedAt = Date.now();
-  await sSet("event-log:"+advId, log, true);
-  return log;
 }
 /* Cache em memória do log da aventura atual, carregado ao entrar em jogo
    e atualizado localmente a cada evento novo (sem re-ler o Firestore a
@@ -3350,19 +3488,42 @@ function showAchievementToast(def){
 /* Fase 2/3: barra "Missão atual" — mostra objetivo, próximo passo e (Fase
    3) os ganchos de história ainda em aberto, guardados em
    adv.estadoNarrativo. Fica escondida até a IA declarar o primeiro
-   objetivo (turno 1 de toda aventura nova ainda não tem isso). */
+   objetivo (turno 1 de toda aventura nova ainda não tem isso).
+   P1 (nova auditoria, seção 12): ganhou também um indicador colorido do
+   status da missão e (seção 11) a lista de NPCs conhecidos, dentro do
+   mesmo painel expansível dos ganchos — a "agenda da aventura". */
+var STATUS_MISSAO_INFO = {
+  ativa:      {cor:"#e8b649", label:"Ativa"},
+  concluida:  {cor:"#4caf6f", label:"Concluída"},
+  falhou:     {cor:"#d9534f", label:"Falhou"},
+  abandonada: {cor:"#7a7a7a", label:"Abandonada"}
+};
+var LABEL_RELACAO_NPC = {aliada:"aliada", neutra:"neutra", hostil:"hostil", desconhecida:"desconhecida"};
 function atualizarMissaoAtual(adv){
   var bar = el("mission-bar");
   if(!bar) return;
   var en = adv && adv.estadoNarrativo;
   if(!en || (!en.objetivo && !en.proximoPasso)){ bar.classList.add("hidden"); return; }
+  var status = STATUS_MISSAO_INFO[en.missaoStatus] || STATUS_MISSAO_INFO.ativa;
+  var glyph = el("mission-glyph-dot");
+  if(glyph){ glyph.style.background = status.cor; glyph.title = "Missão: "+status.label; }
   el("mission-objetivo").textContent = en.objetivo || "";
   el("mission-proximo").textContent = en.proximoPasso ? ("Próximo passo: "+en.proximoPasso) : "";
   var ganchos = Array.isArray(en.ganchosAtivos) ? en.ganchosAtivos.filter(Boolean) : [];
+  var npcs = Array.isArray(en.npcs) ? en.npcs.filter(Boolean) : [];
   var toggle = el("mission-toggle"), lista = el("mission-ganchos");
-  if(ganchos.length){
+  if(ganchos.length || npcs.length){
     toggle.classList.remove("hidden");
-    lista.innerHTML = ganchos.map(function(g){ return "<li>"+esc(g)+"</li>"; }).join("");
+    var html = "";
+    if(ganchos.length) html += ganchos.map(function(g){ return "<li>"+esc(g)+"</li>"; }).join("");
+    if(npcs.length){
+      html += npcs.map(function(n){
+        var relLabel = LABEL_RELACAO_NPC[n.relacao] || "desconhecida";
+        var morto = n.estado==="morta" ? " · morto(a)" : (n.estado==="desaparecida" ? " · desaparecido(a)" : "");
+        return '<li><span class="npc-chip '+esc(n.relacao||"desconhecida")+'">'+esc(n.nome)+"</span> — "+esc(relLabel)+esc(morto)+"</li>";
+      }).join("");
+    }
+    lista.innerHTML = html;
   } else {
     toggle.classList.add("hidden");
     toggle.classList.remove("open");
@@ -3698,12 +3859,33 @@ function applyGmSheetUpdate(existing, incoming){
  return base;
 }
 
+/* Bug real corrigido (auditoria, "Problema crítico nº 4"): antes isto
+   fazia "ler → verificar se está livre → gravar" em três passos
+   separados — dois clientes podiam ler "livre" ao mesmo tempo e os dois
+   concluírem que ganharam o lock. Agora a checagem e a escrita acontecem
+   dentro da MESMA transação do Firestore: se outro cliente gravar o
+   lock no meio do caminho, o Firestore detecta e reexecuta esta função
+   automaticamente com o valor mais novo — não tem como os dois "vencerem". */
 async function acquireLock(key){
- var existing = await sGet(key, true);
- var now = Date.now();
- if(existing && (now-existing.lockedAt)<LOCK_TTL_MS) return false;
- await sSet(key, {lockedBy:session.email, lockedAt:now}, true);
- return true;
+ if(!fbReady()){
+   // Sem Firestore ativo não existe transação real disponível — mesma
+   // lógica de antes, com o mesmo risco documentado, só para não travar
+   // uma sessão sem backend configurado.
+   var existing = await sGet(key, true);
+   var now0 = Date.now();
+   if(existing && (now0-existing.lockedAt)<LOCK_TTL_MS) return false;
+   await sSet(key, {lockedBy:session.email, lockedAt:now0}, true);
+   return true;
+ }
+ var got = false;
+ await fsTransactionUpdate([key], function(atual){
+   var existing = atual[key];
+   if(existing && (Date.now()-existing.lockedAt)<LOCK_TTL_MS){ got = false; return {}; }
+   got = true;
+   var w = {}; w[key] = {lockedBy:session.email, lockedAt:Date.now()};
+   return w;
+ });
+ return got;
 }
 
 /* Appends a message without losing concurrent writes from other players.
@@ -3895,6 +4077,11 @@ async function runGmTurn(advId, sceneId){
       }
  if(data.fichas){
  var validMembers = (adv.members||[]).filter(function(mm){ return mm.status==="confirmado"; }).map(function(mm){ return normEmail(mm.email); });
+ // P1 (nova auditoria): eventos determinísticos do "motor", coletados
+ // aqui e registrados no Event Log em lote no final do turno — nenhum
+ // deles depende da IA declarar nada em "eventos", só de dados que o
+ // app já calcula e confia (ver comentário no topo do Event Log).
+ var eventosMotor = [];
  for(var em in data.fichas){
  if(Object.prototype.hasOwnProperty.call(data.fichas, em)){
  var target = normEmail(em);
@@ -3911,6 +4098,9 @@ async function runGmTurn(advId, sceneId){
  deltaFor("itens","itensGanhos"), deltaFor("itens","itensPerdidos"));
  updatedSheet.magias = applyListDelta(updatedSheet.magias,
  deltaFor("magias","magiasAprendidas"), deltaFor("magias","magiasPerdidas"));
+ deltaFor("itens","itensGanhos").forEach(function(nome){ eventosMotor.push({tipo:"ITEM_GANHO", email:target, nome:nome}); });
+ deltaFor("itens","itensPerdidos").forEach(function(nome){ eventosMotor.push({tipo:"ITEM_PERDIDO", email:target, nome:nome}); });
+ deltaFor("magias","magiasAprendidas").forEach(function(nome){ eventosMotor.push({tipo:"MAGIA_APRENDIDA", email:target, nome:nome}); });
  // XP is accumulated by the app from this turn's award, so repeated
  // absolute values from the GM can never stall or reset progress
  var xpEntry = (data.xpConcedido||[]).filter(function(x){ return normEmail(x.email)===target; })[0];
@@ -3918,7 +4108,10 @@ async function runGmTurn(advId, sceneId){
  var priorXp = (existingSheet && typeof existingSheet.experiencia==="number") ? existingSheet.experiencia : 0;
  updatedSheet.experiencia = priorXp + gained;
  var earnedLevel = Math.floor(updatedSheet.experiencia / XP_PER_LEVEL) + 1;
+ var nivelAntes = (existingSheet && existingSheet.nivel) || 1;
  updatedSheet.nivel = Math.max(updatedSheet.nivel || 1, earnedLevel);
+ if(gained>0) eventosMotor.push({tipo:"XP_GANHO", email:target, quantidade:gained, motivo:(xpEntry&&xpEntry.motivo)||""});
+ if(updatedSheet.nivel > nivelAntes) eventosMotor.push({tipo:"NIVEL_ALCANCADO", email:target, nivel:updatedSheet.nivel});
  // histórico de progresso (nível/XP) para o gráfico em "Dados & Estatísticas" —
  // só grava quando algo realmente mudou, para não inflar o registro a cada turno parado
  if(gained>0 || updatedSheet.nivel > (existingSheet && existingSheet.nivel || 1)){
@@ -3947,6 +4140,7 @@ async function runGmTurn(advId, sceneId){
  if(descansou){
  var resDesc = aplicarDescansoLongo(updatedSheet);
  updatedSheet = resDesc.char;
+ eventosMotor.push({tipo:"DESCANSO", email:target});
  if(target===session.email){
  showUsoToast("Descanso longo: pontos de vida restaurados" +
  (resDesc.recarregados.length ? " \u00b7 recarregados: "+resDesc.recarregados.join(", ") : ""), false);
@@ -3962,6 +4156,16 @@ async function runGmTurn(advId, sceneId){
  }
  await sSet("character:"+target, updatedSheet, true);
  }
+ }
+ // P1: registra em lote tudo que o motor coletou nesta passada pelas
+ // fichas (XP, itens, magias, descanso, nível) — mesma proteção contra
+ // corrida do Event Log, mesmo try/catch pra nunca transformar um
+ // turno bem-sucedido num erro exibido ao jogador.
+ if(eventosMotor.length){
+   try{
+     var logMotor = await registrarEventos(advId, sceneId, eventosMotor, "motor");
+     if(logMotor) eventLogAtual = logMotor;
+   }catch(e){ console.warn("Falha ao registrar eventos do motor:", e); }
  }
  character = await sGet("character:"+session.email, true) || character;
  renderCharacterSheet(character, "sheet-scroll");
@@ -4002,11 +4206,20 @@ async function runGmTurn(advId, sceneId){
  freshAdv.scenes = normalized;
  advChanged = true;
  }
- if(adv.mode==="grupo" && !adv.cenasIndependentes && data.cenaAtiva){ freshAdv.activeSceneId = data.cenaAtiva; advChanged = true; }
+ eventosMotor = eventosMotor || []; // pode não ter sido inicializado se data.fichas estava vazio
+ if(adv.mode==="grupo" && !adv.cenasIndependentes && data.cenaAtiva && data.cenaAtiva!==freshAdv.activeSceneId){
+   eventosMotor.push({tipo:"CENA_MUDOU", de:freshAdv.activeSceneId||"", para:data.cenaAtiva});
+   freshAdv.activeSceneId = data.cenaAtiva; advChanged = true;
+ }
  // Fase 2: memória estruturada da aventura (objetivo, próximo passo,
  // ganchos em aberto) — declarada pela IA a cada turno, mas guardada
  // pelo app no doc da aventura, não só no texto solto. É o que alimenta
  // a barra "Missão atual" durante o jogo e o resumo ao voltar depois.
+ // P1 (nova auditoria, seções 11-12): agora também guarda o status da
+ // missão (com estados como uma "agenda da aventura") e uma memória
+ // curta de NPCs conhecidos ("memória de mundo") — ambos comparados
+ // com o valor anterior para emitir eventos determinísticos quando
+ // algo de fato muda, nunca aplicados às cegas.
  if(data && data.estadoNarrativo && typeof data.estadoNarrativo==="object"){
    var en = data.estadoNarrativo;
    var objetivo = (typeof en.objetivo==="string" && en.objetivo.trim()) ? en.objetivo.trim().slice(0,240) : null;
@@ -4014,10 +4227,36 @@ async function runGmTurn(advId, sceneId){
    var ganchosAtivos = Array.isArray(en.ganchosAtivos)
      ? en.ganchosAtivos.filter(function(g){ return typeof g==="string" && g.trim(); }).map(function(g){ return g.trim().slice(0,160); }).slice(0,5)
      : [];
-   if(objetivo || proximoPasso || ganchosAtivos.length){
-     freshAdv.estadoNarrativo = { objetivo: objetivo, proximoPasso: proximoPasso, ganchosAtivos: ganchosAtivos, atualizadoEm: Date.now() };
+   var STATUS_MISSAO_VALIDOS = {ativa:1, concluida:1, falhou:1, abandonada:1};
+   var missaoStatusAnterior = (freshAdv.estadoNarrativo && freshAdv.estadoNarrativo.missaoStatus) || "ativa";
+   var missaoStatus = (typeof en.missaoStatus==="string" && STATUS_MISSAO_VALIDOS[en.missaoStatus]) ? en.missaoStatus : missaoStatusAnterior;
+   if(missaoStatus!==missaoStatusAnterior){
+     eventosMotor.push({tipo:"MISSAO_STATUS_MUDOU", de:missaoStatusAnterior, para:missaoStatus});
+   }
+   var RELACOES_NPC_VALIDAS = {aliada:1, neutra:1, hostil:1, desconhecida:1};
+   var ESTADOS_NPC_VALIDOS = {viva:1, morta:1, desaparecida:1};
+   var npcsAnteriores = (freshAdv.estadoNarrativo && Array.isArray(freshAdv.estadoNarrativo.npcs)) ? freshAdv.estadoNarrativo.npcs : [];
+   var nomesAntes = {}; npcsAnteriores.forEach(function(n){ nomesAntes[normaliza(n.nome)] = true; });
+   var npcs = Array.isArray(en.npcs)
+     ? en.npcs.filter(function(n){ return n && typeof n.nome==="string" && n.nome.trim(); }).slice(0,8).map(function(n){
+         return {
+           nome: n.nome.trim().slice(0,80),
+           relacao: RELACOES_NPC_VALIDAS[n.relacao] ? n.relacao : "desconhecida",
+           estado: ESTADOS_NPC_VALIDOS[n.estado] ? n.estado : "viva"
+         };
+       })
+     : npcsAnteriores;
+   npcs.forEach(function(n){ if(!nomesAntes[normaliza(n.nome)]) eventosMotor.push({tipo:"NPC_INTRODUZIDO", nome:n.nome}); });
+   if(objetivo || proximoPasso || ganchosAtivos.length || npcs.length){
+     freshAdv.estadoNarrativo = { objetivo: objetivo, proximoPasso: proximoPasso, ganchosAtivos: ganchosAtivos, missaoStatus: missaoStatus, npcs: npcs, atualizadoEm: Date.now() };
      advChanged = true;
    }
+ }
+ if(eventosMotor.length){
+   try{
+     var logMotor2 = await registrarEventos(advId, sceneId, eventosMotor, "motor");
+     if(logMotor2) eventLogAtual = logMotor2;
+   }catch(e){ console.warn("Falha ao registrar eventos do motor (cena/missão/npc):", e); }
  }
  if(advChanged){ freshAdv.updatedAt = Date.now(); await sSet("adv:"+advId, freshAdv, true); currentAdv = freshAdv; }
  atualizarMissaoAtual(freshAdv);
@@ -4669,8 +4908,6 @@ async function anunciarItem(itemId){
   if((character.itensComprados||[]).some(function(n){ return normaliza(n)===normaliza(it.nome); })){
     throw new Error("Este item foi comprado de outro jogador e não pode ser revendido.");
   }
-  var jaAnunciado = (await listarAnuncios()).some(function(a){ return a.itemId===itemId; });
-  if(jaAnunciado) throw new Error("Este item já está anunciado.");
 
   var anuncio = {
     id: itemId, itemId: itemId, nome: it.nome, raridade: it.raridade,
@@ -4680,9 +4917,29 @@ async function anunciarItem(itemId){
     vendedorPersonagem: character.nome,
     anunciadoEm: Date.now(), status:"aberto"
   };
-  await sSet("market:"+itemId, anuncio, true);
-  var idx = await sGet("market-index", true) || [];
-  if(idx.indexOf(itemId)===-1){ idx.push(itemId); await sSet("market-index", idx, true); }
+  var marketKey = "market:"+itemId, indexKey = "market-index";
+  /* Bug real corrigido: a checagem "já está anunciado?" e a criação do
+     anúncio eram passos separados — dois cliques rápidos (ou duas abas)
+     podiam os dois verem "não anunciado" e criar dois anúncios pro
+     mesmo item. Agora checagem e criação acontecem na mesma transação,
+     usando a própria chave do item como trava. */
+  if(fbReady()){
+    await fsTransactionUpdate([marketKey, indexKey], function(atual){
+      var existente = atual[marketKey];
+      if(existente && existente.status==="aberto") throw new Error("Este item já está anunciado.");
+      var idx = atual[indexKey] || [];
+      var w = {};
+      w[marketKey] = anuncio;
+      if(idx.indexOf(itemId)===-1) w[indexKey] = idx.concat([itemId]);
+      return w;
+    });
+  } else {
+    var jaAnunciado = (await listarAnuncios()).some(function(a){ return a.itemId===itemId; });
+    if(jaAnunciado) throw new Error("Este item já está anunciado.");
+    await sSet(marketKey, anuncio, true);
+    var idx2 = await sGet(indexKey, true) || [];
+    if(idx2.indexOf(itemId)===-1){ idx2.push(itemId); await sSet(indexKey, idx2, true); }
+  }
   logAdminEvent("market_listing", {item:it.nome, raridade:it.raridade, preco:anuncio.preco, vendedor:session.email});
   return anuncio;
 }
@@ -4783,52 +5040,136 @@ async function _processarPendencias(){
   return aplicados;
 }
 
+/* Bug real corrigido (auditoria, seção 5 e "Problema crítico nº 3"):
+   comprar um item fazia leituras e gravações em vários documentos
+   separados (anúncio, ficha do comprador, cofre, crédito do vendedor)
+   sem nenhuma garantia de que outro comprador não estava fazendo a
+   mesma coisa ao mesmo tempo — dois jogadores podiam "comprar" o mesmo
+   anúncio quase simultaneamente, e o cofre podia perder incremento de
+   taxa da mesma forma que o Event Log (ver registrarEventos). Agora
+   tudo isso acontece dentro de UMA transação: ou a compra inteira
+   acontece de forma consistente, ou nada é gravado — nunca um estado
+   parcial (ex.: comprador pagou mas o anúncio continua "aberto"). */
 async function comprarItem(itemId){
-  var a = await sGet("market:"+itemId, true);
-  if(!a || a.status!=="aberto") throw new Error("Este item não está mais à venda.");
-  if(a.vendedor===session.email) throw new Error("Você não pode comprar o próprio anúncio.");
+  // Pré-checagem rápida e amigável, fora da transação — só para dar um
+  // erro cedo em pedidos obviamente inválidos sem gastar uma transação
+  // inteira. A decisão real acontece de novo, com dados frescos, dentro
+  // dela (ver abaixo); esta primeira checagem nunca é a autoridade.
+  var pre = await sGet("market:"+itemId, true);
+  if(!pre || pre.status!=="aberto") throw new Error("Este item não está mais à venda.");
+  if(pre.vendedor===session.email) throw new Error("Você não pode comprar o próprio anúncio.");
+
+  var marketKey = "market:"+itemId;
+  var buyerKey = "character:"+session.email;
+  var sellerKey = "character:"+pre.vendedor;
+  var craftedKey = "crafted:"+pre.vendedor;
+  var treasuryKey = "market-treasury";
+  var ledgerId = "ld_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,7);
+  var ledgerKey = "ledger:"+pre.vendedor+":"+ledgerId;
+
+  if(!fbReady()) return await comprarItemSemTransacao(itemId, pre);
+
+  var resultado = null;
+  await fsTransactionUpdate([marketKey, buyerKey, sellerKey, craftedKey, treasuryKey], function(atual){
+    var a = atual[marketKey];
+    if(!a || a.status!=="aberto") throw new Error("Este item não está mais à venda — outra pessoa deve ter comprado primeiro.");
+    if(a.vendedor===session.email) throw new Error("Você não pode comprar o próprio anúncio.");
+    if(a.nivelItem > nivelMaximoCompravel(character)){
+      throw new Error("Item de nível "+a.nivelItem+" — seu personagem só pode adquirir até o nível "+nivelMaximoCompravel(character)+".");
+    }
+    var buyer = atual[buyerKey];
+    if(!buyer) throw new Error("Não encontrei sua ficha.");
+    var seller = atual[sellerKey];
+    if(!seller) throw new Error("Não encontrei o vendedor.");
+
+    var w = {};
+    if(!(seller.equipamento||[]).some(function(e){ return normaliza(e)===normaliza(a.nome); })){
+      // O vendedor não tem mais o item (perdeu/vendeu por outro canal):
+      // cancela o anúncio dentro da MESMA transação, em vez de lançar um
+      // erro que descartaria essa correção — assim o anúncio nunca fica
+      // "aberto" apontando para um item que não existe mais.
+      var aCancelado = clonar(a); aCancelado.status = "cancelado";
+      w[marketKey] = aCancelado;
+      resultado = {tipo:"cancelado"};
+      return w;
+    }
+
+    var meuOuro = parseMoeda(buyer.dinheiro);
+    if(meuOuro < a.preco) throw new Error("Ouro insuficiente: o item custa "+fmtMoeda(a.preco)+" e você tem "+fmtMoeda(meuOuro)+".");
+
+    var taxa = Math.round(a.preco * TAXA_MERCADO * 100)/100;
+    var liquido = Math.round((a.preco - taxa)*100)/100;
+
+    var buyerNovo = clonar(buyer);
+    buyerNovo.dinheiro = fmtMoeda(meuOuro - a.preco);
+    buyerNovo.equipamento = applyListDelta(buyerNovo.equipamento, [a.nome], []);
+    buyerNovo.itensComprados = (buyerNovo.itensComprados||[]).concat([a.nome]);
+    buyerNovo.itensVendaveis = (buyerNovo.itensVendaveis||[]).filter(function(n){ return normaliza(n)!==normaliza(a.nome); });
+
+    /* As regras do Firestore só deixam cada jogador escrever na PRÓPRIA
+       ficha — por isso o comprador não credita o vendedor diretamente.
+       Registra um crédito pendente, que o vendedor aplica sozinho ao
+       abrir o app (ver aplicarCreditosPendentes). */
+    var pend = { id:ledgerId, para:a.vendedor, ouro:liquido, removerItem:a.nome,
+      motivo:"Venda de "+a.nome, de:session.email, ts:Date.now() };
+
+    var craftedNovo = (atual[craftedKey]||[]).filter(function(x){ return x.id!==itemId; });
+
+    var aVendido = clonar(a);
+    aVendido.status = "vendido"; aVendido.compradoPor = session.email; aVendido.compradoEm = Date.now(); aVendido.taxa = taxa;
+
+    var cofre = atual[treasuryKey] || {total:0, transacoes:0, distribuido:0};
+    var cofreNovo = clonar(cofre);
+    cofreNovo.total = Math.round((cofre.total + taxa)*100)/100;
+    cofreNovo.transacoes = (cofre.transacoes||0) + 1;
+
+    resultado = {tipo:"vendido", anuncio:aVendido, taxa:taxa, liquido:liquido};
+    w[marketKey] = aVendido;
+    w[buyerKey] = buyerNovo;
+    w[ledgerKey] = pend;
+    w[craftedKey] = craftedNovo;
+    w[treasuryKey] = cofreNovo;
+    return w;
+  });
+
+  character = (await sGet(buyerKey, true)) || character;
+  if(resultado.tipo==="cancelado") throw new Error("O vendedor não tem mais este item. Anúncio cancelado.");
+  logAdminEvent("market_sale", {item:resultado.anuncio.nome, preco:resultado.anuncio.preco, taxa:resultado.taxa, vendedor:resultado.anuncio.vendedor, comprador:session.email});
+  return resultado;
+}
+/* Fallback só para quando o Firebase não está ativo nesta sessão (sem
+   Firestore não existe transação real disponível) — mesma lógica de
+   antes, com o mesmo risco de corrida documentado acima, só para não
+   travar a compra numa sessão sem backend configurado. */
+async function comprarItemSemTransacao(itemId, a){
   if(a.nivelItem > nivelMaximoCompravel(character)){
     throw new Error("Item de nível "+a.nivelItem+" — seu personagem só pode adquirir até o nível "+nivelMaximoCompravel(character)+".");
   }
   var meuOuro = parseMoeda(character.dinheiro);
   if(meuOuro < a.preco) throw new Error("Ouro insuficiente: o item custa "+fmtMoeda(a.preco)+" e você tem "+fmtMoeda(meuOuro)+".");
-
   var vendedorFicha = await sGet("character:"+a.vendedor, true);
   if(!vendedorFicha) throw new Error("Não encontrei o vendedor.");
   if(!(vendedorFicha.equipamento||[]).some(function(e){ return normaliza(e)===normaliza(a.nome); })){
     a.status="cancelado"; await sSet("market:"+itemId, a, true);
     throw new Error("O vendedor não tem mais este item. Anúncio cancelado.");
   }
-  /* As regras do Firestore só deixam cada jogador escrever na PRÓPRIA ficha —
-     por isso o comprador não pode creditar o vendedor diretamente (era esse o
-     motivo do ouro sumir). Registramos um crédito pendente, que o vendedor
-     aplica sozinho ao abrir o app. */
-
   var taxa = Math.round(a.preco * TAXA_MERCADO * 100)/100;
   var liquido = Math.round((a.preco - taxa)*100)/100;
-
-  // comprador: paga e recebe o item
   character.dinheiro = fmtMoeda(meuOuro - a.preco);
   character.equipamento = applyListDelta(character.equipamento, [a.nome], []);
   character.itensComprados = (character.itensComprados||[]).concat([a.nome]);
   character.itensVendaveis = (character.itensVendaveis||[]).filter(function(n){ return normaliza(n)!==normaliza(a.nome); });
   await sSet("character:"+session.email, character, true);
-
-  // vendedor: entrega o item e recebe o líquido
   var pend = {
     id: "ld_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,7),
     para: a.vendedor, ouro: liquido, removerItem: a.nome,
     motivo: "Venda de "+a.nome, de: session.email, ts: Date.now()
   };
   await sSet("ledger:"+a.vendedor+":"+pend.id, pend, true);
-
-  // o item deixa de ser "fabricado por" para efeito de revenda: quem compra não pode revender
   var craftedVendedor = await itensFabricadosDe(a.vendedor);
   await sSet("crafted:"+a.vendedor, craftedVendedor.filter(function(x){ return x.id!==itemId; }), true);
-
   a.status = "vendido"; a.compradoPor = session.email; a.compradoEm = Date.now(); a.taxa = taxa;
   await sSet("market:"+itemId, a, true);
-
   var cofre = await sGet("market-treasury", true) || {total:0, transacoes:0, distribuido:0};
   cofre.total = Math.round((cofre.total + taxa)*100)/100;
   cofre.transacoes = (cofre.transacoes||0) + 1;
@@ -5830,31 +6171,71 @@ async function criarEvento(dados){
   return ev;
 }
 
+/* Bug real corrigido (auditoria, seção 19: "inscrições podem concorrer
+   entre si"): ler o evento, empurrar a inscrição na lista em memória e
+   gravar de volta é a mesma corrida do Event Log e do mercado — dois
+   jogadores se inscrevendo quase ao mesmo tempo podiam fazer um dos
+   dois sumir da lista sem erro nenhum. Agora roda dentro de uma
+   transação: o Firestore garante que a leitura e a escrita deste
+   documento são atômicas. */
 async function inscreverNoEvento(evId){
-  var ev = await sGet("event:"+evId, true);
-  if(!ev) throw new Error("Evento não encontrado.");
-  if(faseDoEvento(ev)!=="inscricoes") throw new Error("As inscrições para este evento não estão abertas.");
-  var eleg = personagemElegivel(ev, character);
+  var key = "event:"+evId;
+  var pre = await sGet(key, true);
+  if(!pre) throw new Error("Evento não encontrado.");
+  if(faseDoEvento(pre)!=="inscricoes") throw new Error("As inscrições para este evento não estão abertas.");
+  var eleg = personagemElegivel(pre, character);
   if(!eleg.ok) throw new Error(eleg.motivo);
-  ev.inscritos = ev.inscritos || [];
-  if(ev.inscritos.some(function(i){ return i.email===session.email; })) return ev;
-  ev.inscritos.push({
-    email: session.email, name: session.name,
-    personagem: character.nome, classe: character.classe,
-    ancestralidade: character.ancestralidade, nivel: character.nivel||1,
-    inscritoEm: Date.now()
+
+  if(!fbReady()){
+    var ev0 = pre;
+    ev0.inscritos = ev0.inscritos || [];
+    if(ev0.inscritos.some(function(i){ return i.email===session.email; })) return ev0;
+    ev0.inscritos.push({ email:session.email, name:session.name, personagem:character.nome,
+      classe:character.classe, ancestralidade:character.ancestralidade, nivel:character.nivel||1, inscritoEm:Date.now() });
+    await sSet(key, ev0, true);
+    logAdminEvent("event_signup", {evento:ev0.nome, email:session.email});
+    return ev0;
+  }
+
+  var evFinal = null;
+  await fsTransactionUpdate([key], function(atual){
+    var ev = atual[key];
+    if(!ev) throw new Error("Evento não encontrado.");
+    if(faseDoEvento(ev)!=="inscricoes") throw new Error("As inscrições para este evento não estão abertas.");
+    var eleg2 = personagemElegivel(ev, character);
+    if(!eleg2.ok) throw new Error(eleg2.motivo);
+    ev.inscritos = ev.inscritos || [];
+    if(!ev.inscritos.some(function(i){ return i.email===session.email; })){
+      ev.inscritos.push({ email:session.email, name:session.name, personagem:character.nome,
+        classe:character.classe, ancestralidade:character.ancestralidade, nivel:character.nivel||1, inscritoEm:Date.now() });
+    }
+    evFinal = ev;
+    var w = {}; w[key] = ev;
+    return w;
   });
-  await sSet("event:"+evId, ev, true);
-  logAdminEvent("event_signup", {evento:ev.nome, email:session.email});
-  return ev;
+  logAdminEvent("event_signup", {evento:evFinal.nome, email:session.email});
+  return evFinal;
 }
 
 async function cancelarInscricao(evId){
-  var ev = await sGet("event:"+evId, true);
-  if(!ev) return;
-  ev.inscritos = (ev.inscritos||[]).filter(function(i){ return i.email!==session.email; });
-  await sSet("event:"+evId, ev, true);
-  return ev;
+  var key = "event:"+evId;
+  if(!fbReady()){
+    var ev0 = await sGet(key, true);
+    if(!ev0) return;
+    ev0.inscritos = (ev0.inscritos||[]).filter(function(i){ return i.email!==session.email; });
+    await sSet(key, ev0, true);
+    return ev0;
+  }
+  var evFinal = null;
+  await fsTransactionUpdate([key], function(atual){
+    var ev = atual[key];
+    if(!ev){ evFinal = null; return {}; }
+    ev.inscritos = (ev.inscritos||[]).filter(function(i){ return i.email!==session.email; });
+    evFinal = ev;
+    var w = {}; w[key] = ev;
+    return w;
+  });
+  return evFinal;
 }
 
 /* Distribui os que ingressaram em cenas de no máximo 4 personagens */
@@ -5873,7 +6254,8 @@ function montarCenas(emails){
 }
 
 async function ingressarNoEvento(evId){
-  var ev = await sGet("event:"+evId, true);
+  var key = "event:"+evId;
+  var ev = await sGet(key, true);
   if(!ev) throw new Error("Evento não encontrado.");
   var fase = faseDoEvento(ev);
   if(fase!=="ingresso" && fase!=="emJogo") throw new Error("Fora da janela de ingresso deste evento.");
@@ -5882,8 +6264,33 @@ async function ingressarNoEvento(evId){
   var bloqProd = await bloqueadoPorProducao();
   if(bloqProd) throw new Error(bloqProd);
 
-  ev.ingressaram = ev.ingressaram || [];
-  if(ev.ingressaram.indexOf(session.email)===-1) ev.ingressaram.push(session.email);
+  /* Corrigido parcialmente com transação: adicionar o próprio e-mail à
+     lista ev.ingressaram usa o mesmo padrão já corrigido em
+     inscreverNoEvento — leitura e escrita atômicas deste documento.
+     LIMITAÇÃO CONHECIDA E DOCUMENTADA (não escondida): o passo seguinte
+     — criar a aventura do evento na primeira entrada, ou encaixar um
+     retardatário numa cena com vaga — ainda é ler/alterar/gravar em
+     dois documentos (event: e adv:) fora desta transação. Dois
+     jogadores entrando no mesmíssimo instante ainda podem, em teoria,
+     disputar a mesma vaga de cena. É um caso bem mais raro que os já
+     corrigidos (só acontece nos primeiros segundos de um evento
+     concorrido) e a correção completa exigiria unir a criação da
+     aventura + atribuição de cena numa única transação multi-documento
+     mais complexa — fica para uma próxima iteração dedicada a isso.*/
+  if(fbReady()){
+    await fsTransactionUpdate([key], function(atual){
+      var e2 = atual[key] || ev;
+      e2.ingressaram = e2.ingressaram || [];
+      if(e2.ingressaram.indexOf(session.email)===-1) e2.ingressaram.push(session.email);
+      ev = e2;
+      var w = {}; w[key] = e2;
+      return w;
+    });
+  } else {
+    ev.ingressaram = ev.ingressaram || [];
+    if(ev.ingressaram.indexOf(session.email)===-1) ev.ingressaram.push(session.email);
+    await sSet(key, ev, true);
+  }
 
   if(!ev.advId){
     var advId = "adv_ev_"+ev.id;
