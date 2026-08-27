@@ -253,7 +253,8 @@ a{color:var(--arcane-bright);}
 .gold-line{font-family:var(--font-mono);font-weight:700;color:var(--ink);font-size:13px;}
 .party-row{display:flex;align-items:center;gap:8px;padding:7px 4px;border-bottom:1px solid rgba(43,34,19,.08);}
 .party-row:last-child{border-bottom:none;}
-.party-row .pv{width:8px;height:8px;border-radius:50%;background:var(--arcane);flex-shrink:0;}
+.party-row .pv{width:8px;height:8px;border-radius:50%;background:var(--arcane);flex-shrink:0;opacity:.45;}
+.party-row .pv.online{background:#4caf6f;opacity:1;box-shadow:0 0 0 2px rgba(76,175,111,.18);}
 .party-row .pn{flex:1;min-width:0;}
 .party-row .pn b{display:block;font-size:12.5px;color:var(--ink);}
 .party-row .pn span{display:block;font-size:10.5px;color:var(--ink-soft);}
@@ -265,6 +266,7 @@ a{color:var(--arcane-bright);}
 .pdf-banner{margin:0 16px 0;padding:8px 12px;border-radius:8px;background:var(--void-3);border:1px solid var(--line-soft);font-size:11.5px;color:var(--text-faint);display:flex;align-items:center;gap:8px;}
 .pdf-banner a{color:var(--arcane-bright);text-decoration:none;font-weight:600;}
 .turno-pill{font-size:11px;padding:5px 11px;border-radius:999px;background:var(--void-3);border:1px solid var(--line);color:var(--text-faint);}
+.peer-typing-pill{font-size:11px;padding:5px 11px;margin:6px 16px 0;color:var(--text-faint);font-style:italic;}
 .mission-bar{padding:8px 14px;margin:0 14px 8px;background:var(--void-2);border:1px solid var(--line);border-left:3px solid var(--brass-dim);border-radius:9px;}
 .mission-row{display:flex;align-items:flex-start;gap:8px;}
 .mission-glyph{font-size:14px;line-height:1.4;flex-shrink:0;position:relative;}
@@ -295,6 +297,8 @@ a{color:var(--arcane-bright);}
 #turn-bell.minha-vez{color:var(--arcane-bright);animation:bell-blink 1.4s ease-in-out infinite;}
 @keyframes bell-blink{0%,100%{opacity:1;filter:drop-shadow(0 0 0 rgba(107,179,158,0));}50%{opacity:.45;filter:drop-shadow(0 0 6px rgba(107,179,158,.9));}}
 .timer-pill{margin:10px 16px 0;padding:8px 12px;border-radius:9px;background:rgba(176,71,58,.14);border:1px solid var(--ember);font-size:12px;color:var(--ember-bright);display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-weight:700;}
+.timer-pill .pular-vez-btn{margin-left:auto;font-family:var(--font-body,inherit);font-weight:600;font-size:11px;padding:3px 9px;border-radius:999px;border:1px solid currentColor;background:transparent;color:inherit;cursor:pointer;opacity:.85;}
+.timer-pill .pular-vez-btn:hover{opacity:1;}
 .timer-pill.calm{background:var(--void-3);border-color:var(--line-soft);color:var(--text-lo);}
 #chat-scroll{flex:1;min-height:0;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px;}
 .msg{max-width:82%;display:flex;flex-direction:column;gap:4px;animation:msgin .25s ease;}
@@ -433,6 +437,24 @@ a{color:var(--arcane-bright);}
 .char-card .cc-info b{display:block;font-size:14.5px;color:var(--text-hi);}
 .char-card .cc-info span{font-size:12px;color:var(--text-lo);}
 .action-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:26px;}
+/* P4 (nova auditoria, seção 21/22 — "a maior oportunidade de retenção" e
+   "Tela Continuar campanha como ponto principal de entrada"): consolida
+   missão, ganchos, progresso e resumo da última sessão num único cartão
+   de destaque, antes até dos botões de nova aventura — o primeiro
+   convite ao abrir o app volta a ser "retomar", não "começar de novo". */
+.continue-box{background:linear-gradient(155deg,var(--void-2),var(--void-3));border:1px solid var(--brass-dim);border-radius:16px;padding:18px 20px;margin-bottom:22px;}
+.continue-box .cb-eyebrow{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--brass-bright);margin-bottom:4px;}
+.continue-box .cb-title{font-family:var(--font-display);font-size:17px;color:var(--text-hi);margin-bottom:2px;}
+.continue-box .cb-resumo{font-size:11.5px;color:var(--text-lo);margin-bottom:12px;}
+.continue-box .cb-row{display:flex;gap:8px;font-size:12.5px;color:var(--text-hi);margin-bottom:6px;line-height:1.45;}
+.continue-box .cb-row b{color:var(--brass-bright);font-weight:600;flex-shrink:0;}
+.continue-box .cb-ganchos{margin:6px 0 0;padding-left:0;list-style:none;}
+.continue-box .cb-ganchos li{font-size:11.5px;color:var(--text-lo);padding:2px 0 2px 14px;position:relative;}
+.continue-box .cb-ganchos li::before{content:"•";position:absolute;left:0;color:var(--brass-dim);}
+.continue-box .cb-progresso{margin-top:12px;}
+.continue-box .cb-progresso .cb-prog-label{display:flex;justify-content:space-between;font-size:11px;color:var(--text-faint);margin-bottom:4px;font-family:var(--font-mono);}
+.continue-box .cb-btn{margin-top:14px;width:100%;padding:11px;border-radius:10px;border:none;background:linear-gradient(90deg,var(--brass-dim),var(--brass-bright));color:var(--void);font-family:var(--font-display);font-weight:700;font-size:14px;cursor:pointer;}
+.continue-box .cb-btn:hover{filter:brightness(1.06);}
 .action-card{background:var(--void-2);border:1px solid var(--line);border-radius:14px;padding:18px;text-align:left;cursor:pointer;transition:border-color .15s,transform .1s;}
 .action-card:hover{border-color:var(--brass-dim);transform:translateY(-1px);}
 .action-card .glyph{font-size:22px;margin-bottom:8px;}
@@ -727,6 +749,7 @@ a{color:var(--arcane-bright);}
  <div class="hub-scroll">
  <div class="hub-header"><div class="info"><h1 id="hub-greeting">Olá</h1><p data-i18n="hub.sub">Escolha uma aventura ou comece uma nova</p></div></div>
  <div class="char-card" id="hub-char-card"></div>
+ <div class="continue-box hidden" id="continue-box"></div>
  <div class="action-grid">
  <div class="action-card" id="hub-new-solo"><div class="glyph">🗡️</div><b data-i18n="hub.novaSolo">Nova aventura solo</b><span data-i18n="hub.novaSoloSub">Só você e o Mestre. Pode anexar o livro de regras.</span></div>
  <div class="action-card" id="hub-new-group"><div class="glyph">👥</div><b data-i18n="hub.novaGrupo">Nova aventura em grupo</b><span data-i18n="hub.novaGrupoSub">Convide outros jogadores cadastrados pelo e-mail.</span></div>
@@ -856,6 +879,7 @@ a{color:var(--arcane-bright);}
    <ul id="mission-ganchos" class="mission-ganchos hidden"></ul>
  </div>
  <div class="turno-pill hidden" id="turno-pill"></div>
+ <div class="peer-typing-pill hidden" id="peer-typing-pill"></div>
  <div id="timer-pill" class="timer-pill hidden">
 </div>
  <div id="skill-check-box" class="skill-check hidden">
@@ -1103,10 +1127,32 @@ a{color:var(--arcane-bright);}
 var FICHA_START = "\u00a7\u00a7\u00a7FICHA-INICIO\u00a7\u00a7\u00a7";
 var FICHA_END = "\u00a7\u00a7\u00a7FICHA-FIM\u00a7\u00a7\u00a7";
 var JOIN_WINDOW_MS = 3*60*1000;
+/* P3 (nova auditoria, seção 18 — "timeout de 7 minutos é muito longo para
+   algumas situações"): a janela de resposta agora varia pelo tipo de
+   momento que a IA declara em estadoNarrativo/urgenciaAcao ("combate",
+   "exploracao" ou "social"). ACTION_WINDOW_MS permanece como o valor
+   padrão — usado só quando a IA não informa urgência (ex.: fichas geradas
+   antes desta mudança, ou uma resposta sem esse campo). */
 var ACTION_WINDOW_MS = 7*60*1000;
+var ACTION_WINDOW_BY_URGENCIA = {
+  combate:    3*60*1000,
+  exploracao: 8*60*1000,
+  social:     12*60*1000
+};
+function actionWindowFor(pending){
+  return (pending && ACTION_WINDOW_BY_URGENCIA[pending.urgencia]) || ACTION_WINDOW_MS;
+}
 var TYPING_GRACE_MS = 60*1000; // extra time while the player is actively typing
 var POLL_MS = 4000;
 var LOCK_TTL_MS = 25000;
+/* P3 (nova auditoria, seção 19 — presença/"digitando"): cadência de
+   heartbeat de presença e do indicador de digitação compartilhado. Mais
+   frequente que o POLL_MS geral seria desperdício de escrita; menos
+   frequente ficaria perceptivelmente "atrasado" para quem está olhando. */
+var PRESENCE_HEARTBEAT_MS = 25000;
+var PRESENCE_ONLINE_WINDOW_MS = 45000;
+var PEER_TYPING_WRITE_MS = 4000;
+var PEER_TYPING_SHOW_WINDOW_MS = 6000;
 
 var EMPTY_CHARACTER = {
  nome:null, ancestralidade:null, linhagem:null, antecedente:null, classe:null, nivel:null,
@@ -1563,7 +1609,10 @@ var partyCache = {}; // email -> character
 function isSyncedKey(key){
  // TODA chave compartilhada precisa estar aqui, senao o dado fica preso no
  // navegador de quem criou e mais ninguem enxerga.
- return /^(pub:|character:|adv:|member-adv:|scene-msgs:|pending-action:|check:|admin-config|event:|events-index|event-log:|market:|market-index|market-treasury|crafted:|producao:|ledger:|forge-chat:|turno:|iteminfo:|producao:|subscription:|upgrade-request:)/.test(key);
+ // P3 (nova auditoria, seção 19 — presença/"digitando"): presence: e
+ // typing: também precisam sincronizar, senão cada jogador só vê a
+ // própria presença/digitação, nunca a dos outros.
+ return /^(pub:|character:|adv:|member-adv:|scene-msgs:|pending-action:|check:|admin-config|event:|events-index|event-log:|market:|market-index|market-treasury|crafted:|producao:|ledger:|forge-chat:|turno:|iteminfo:|producao:|subscription:|upgrade-request:|presence:|typing:)/.test(key);
 }
 /* Values are stored wrapped as {__v:rev, __t:ts, d:data} so a stale or failed
  remote write can never overwrite newer local data on screen. */
@@ -2131,7 +2180,7 @@ function advBody(isGroup, adv){
 (isGroup ?
 "CONTROLE DE CENA: a aventura pode ter uma ou mais cenas simultâneas (ex: o grupo se dividiu). Apenas UMA cena está \"em foco\" por vez (campo \"cenaAtiva\"). Jogadores fora da cena ativa não veem nada até você voltar a atenção para eles. Prefira manter todos numa cena só; separe apenas quando fizer sentido narrativo, e sempre avise no texto quando cortar de uma cena para outra. Para reunir o grupo, volte a colocar todos na mesma cena.\n\n" +
 "UM DE CADA VEZ: dirija-se sempre a UM personagem por vez. Termine a narracao com uma pergunta ou situacao endereçada a ele pelo nome e preencha \"vezDe\" com o e-mail desse jogador — somente ele podera responder. Depois que ele agir, narre a consequencia e passe a vez ao proximo, alternando para que ninguem fique de fora. Nunca faca perguntas abertas ao grupo inteiro. Se a cena exigir reacao coletiva, ainda assim resolva um personagem por vez.\n\n" +
-"PEDIDOS DE AÇÃO E TEMPO: quando sua narração termina esperando uma ação de um ou mais jogadores da cena ativa, marque \"aguardandoAcao\": true e liste os e-mails desses jogadores em \"jogadoresEsperados\". O aplicativo dá até 7 minutos para cada um responder; quem não responder a tempo terá uma ação escolhida por você automaticamente na rodada seguinte. Quando não há pedido pendente, marque \"aguardandoAcao\": false e \"jogadoresEsperados\": [].\n\n"
+"PEDIDOS DE AÇÃO E TEMPO: quando sua narração termina esperando uma ação de um ou mais jogadores da cena ativa, marque \"aguardandoAcao\": true e liste os e-mails desses jogadores em \"jogadoresEsperados\". Diga também em \"urgenciaAcao\" que tipo de momento é este: \"combate\" (tenso, cada segundo conta — o app dá uma janela curta), \"exploracao\" (o jogador pode querer investigar, conversar ou pensar com calma — janela mais longa) ou \"social\" (uma conversa, negociação ou decisão importante — a mais longa de todas). O aplicativo usa isso para decidir quanto tempo dar a cada jogador antes de escolher uma ação por ele automaticamente. Quando não há pedido pendente, marque \"aguardandoAcao\": false e \"jogadoresEsperados\": [].\n\n"
 : (
   "Esta é uma aventura SOLO: existe apenas o jogador e apenas uma cena contínua. Não divida cenas, não gerencie grupos e não use campos de cena — narre direto para ele e aguarde a resposta pelo tempo que ele precisar.\n\n" +
   ((adv && adv.companheirosAtivados) ?
@@ -2146,7 +2195,7 @@ FICHA_START+"\n{ ...JSON... }\n"+FICHA_END+"\n\n" +
 (isGroup ?
 ' "cenaAtiva": "id-da-cena",\n'+
 ' "cenas": [{"id": string, "nome": string, "membros": [email,...]}],\n'+
-' "aguardandoAcao": boolean, "jogadoresEsperados": [email,...],\n' : "") +
+' "aguardandoAcao": boolean, "jogadoresEsperados": [email,...], "urgenciaAcao": "combate"|"exploracao"|"social",\n' : "") +
 ' "fichas": { "email-do-jogador": { ...mesmo esquema de personagem de sempre (nome, ancestralidade, linhagem, antecedente, classe, nivel, experiencia, pontosVida{atual,maximo}, ca, cdClasse, percepcao, deslocamento, resistencia{fortitude,reflexos,vontade}, atributos{for,des,con,int,sab,car}, pericias[], talentos[], equipamento[], dinheiro, condicoes[], magias[], aparencia, personalidade, notas)... } },\n'+
 ' "xpConcedido": [{"email": string, "quantidade": number, "motivo": string}],\n'+
 ' \"usosDefinidos\": [{\"email\": string, \"itens\": [{\"nome\": string, \"maximo\": number, \"tipo\": \"item\"|\"magia\"|\"habilidade\"}]}],\n'+
@@ -2420,7 +2469,12 @@ function renderCharacterSheet(c, rootId){
  var pc = partyCache[em];
  if(!pc) return "";
  var hp = pc.pontosVida ? (pc.pontosVida.atual!==null? pc.pontosVida.atual:"—")+"/"+(pc.pontosVida.maximo!==null?pc.pontosVida.maximo:"—") : "—";
- return '<div class="party-row"><span class="pv"></span><span class="pn"><b>'+esc(pc.nome||em)+'</b><span>'+esc(pc.classe||"")+(pc.nivel?" nv."+pc.nivel:"")+'</span></span><span class="php">'+hp+'</span></div>';
+ // P3 (nova auditoria, seção 19 — "presença"): a bolinha ao lado do nome
+ // fica verde quando o app recebeu um heartbeat desse jogador nos
+ // últimos PRESENCE_ONLINE_WINDOW_MS; senão fica no estilo neutro de
+ // sempre (não sabemos se está offline ou só não temos leitura ainda).
+ var online = estaOnlineAgora(em);
+ return '<div class="party-row"><span class="pv'+(online?" online":"")+'" title="'+(online?"Online agora":"Sem confirmação recente")+'"></span><span class="pn"><b>'+esc(pc.nome||em)+'</b><span>'+esc(pc.classe||"")+(pc.nivel?" nv."+pc.nivel:"")+'</span></span><span class="php">'+hp+'</span></div>';
  }).join("");
  html += sectionHtml("grupo","Grupo", rows||'<p class="sheet-note">Sem outros membros na cena.</p>');
  }
@@ -2651,7 +2705,7 @@ el("hub-new-group").addEventListener("click", function(){ openNewAdvModal(); });
    Isto só LÊ dados e mostra um aviso; a resolução em si continua
    acontecendo com segurança dentro de maybeResolveTimeout(), já dentro
    do contexto correto da cena/personagem. */
-var STUCK_GRACE_MS = 3*60*1000; // folga além do próprio prazo de 7min, pra não avisar cedo demais
+var STUCK_GRACE_MS = 3*60*1000; // folga além do próprio prazo (varia por urgência), pra não avisar cedo demais
 async function detectarAventurasTravadas(advsAtivas){
   var resultado = {};
   var candidatas = (advsAtivas||[]).filter(function(a){ return a.mode==="grupo" && a.status==="ativa"; });
@@ -2662,7 +2716,7 @@ async function detectarAventurasTravadas(advsAtivas){
         var pending = await sGet("pending-action:"+adv.id+":"+sceneIds[i], true);
         if(!pending || !pending.requestedAt) continue;
         var faltam = (pending.expectedEmails||[]).filter(function(em){ return (pending.respondedEmails||[]).indexOf(em)===-1; });
-        if(faltam.length && (Date.now()-pending.requestedAt) > (ACTION_WINDOW_MS+STUCK_GRACE_MS)){
+        if(faltam.length && (Date.now()-pending.requestedAt) > (actionWindowFor(pending)+STUCK_GRACE_MS)){
           resultado[adv.id] = true;
           break;
         }
@@ -2670,6 +2724,63 @@ async function detectarAventurasTravadas(advsAtivas){
     }catch(e){ /* leitura best-effort — nunca bloqueia o hub */ }
   }));
   return resultado;
+}
+
+/* P4 (nova auditoria, seção 21/22 — "a maior oportunidade de retenção" e
+   "Tela Continuar campanha como ponto principal de entrada"): consolida
+   num único cartão tudo que já existia espalhado — resumo da última
+   sessão (Fase 4), objetivo/próximo passo/ganchos (estadoNarrativo),
+   progresso de nível/XP (ficha do jogador) e o aviso de companheiros de
+   IA — com um botão único para retomar. Não recalcula nada disso: só lê
+   o que os outros sistemas já mantêm atualizado. */
+async function renderContinueCard(adv){
+  var box = el("continue-box");
+  if(!box) return;
+  if(!adv){ box.classList.add("hidden"); box.innerHTML=""; return; }
+  var en = adv.estadoNarrativo || {};
+  var resumo = adv.ultimaSessaoResumo;
+  var html = '<div class="cb-eyebrow">🕯️ Continuar de onde parei</div>';
+  html += '<div class="cb-title">'+esc(adv.name)+'</div>';
+  if(resumo && (resumo.turnos>0 || resumo.xpGanho>0 || resumo.inimigosDerrotados>0)){
+    var bits = [];
+    if(resumo.turnos>0) bits.push(resumo.turnos+" turno"+(resumo.turnos>1?"s":""));
+    if(resumo.xpGanho>0) bits.push("+"+resumo.xpGanho+" XP");
+    if(resumo.inimigosDerrotados>0) bits.push(resumo.inimigosDerrotados+" inimigo"+(resumo.inimigosDerrotados>1?"s":"")+" derrotado"+(resumo.inimigosDerrotados>1?"s":""));
+    html += '<div class="cb-resumo">Na última sessão: '+esc(bits.join(", "))+'</div>';
+  }
+  if(en.objetivo) html += '<div class="cb-row"><b>Missão</b><span>'+esc(en.objetivo)+'</span></div>';
+  if(en.proximoPasso) html += '<div class="cb-row"><b>Próximo passo</b><span>'+esc(en.proximoPasso)+'</span></div>';
+  var ganchos = Array.isArray(en.ganchosAtivos) ? en.ganchosAtivos.filter(Boolean).slice(0,3) : [];
+  if(ganchos.length) html += '<ul class="cb-ganchos">'+ganchos.map(function(g){ return "<li>"+esc(g)+"</li>"; }).join("")+'</ul>';
+  if(adv.mode!=="grupo" && adv.companheirosAtivados) html += '<div class="cb-row"><b>🤝</b><span>Com companheiros de IA</span></div>';
+  // progresso de nível/XP vem da ficha do jogador (não da aventura) —
+  // mesma conta já usada na aba de personagem, pra nunca divergir dela.
+  try{
+    var c = await sGet("character:"+session.email, true);
+    if(c && typeof c.experiencia==="number"){
+      var xpInLevel = ((c.experiencia % XP_PER_LEVEL) + XP_PER_LEVEL) % XP_PER_LEVEL;
+      var xpPct = Math.max(0, Math.min(100, (xpInLevel/XP_PER_LEVEL)*100));
+      html += '<div class="cb-progresso"><div class="cb-prog-label"><span>Nível '+(c.nivel||1)+'</span><span>'+xpInLevel+' / '+XP_PER_LEVEL+' XP</span></div>'+
+        '<div class="hp-bar"><div class="hp-bar-fill xp-fill" style="width:'+xpPct+'%"></div></div></div>';
+    }
+    // conquistas desbloqueadas recentemente (últimas 24h) — mesma lista
+    // de sempre (ACHIEVEMENT_DEFS), só filtrada por data, sem recalcular
+    // nada: a checagem em si já roda em verificarConquistas() de sempre.
+    var conquistasRecentes = conquistasDesbloqueadas(c).filter(function(cq){
+      return cq.desbloqueadaEm && (Date.now()-cq.desbloqueadaEm) < 24*60*60*1000;
+    });
+    if(conquistasRecentes.length){
+      var nomes = conquistasRecentes.map(function(cq){
+        var def = ACHIEVEMENT_DEFS.filter(function(d){ return d.id===cq.id; })[0];
+        return def ? (def.glyph+" "+def.nome) : cq.id;
+      });
+      html += '<div class="cb-row"><b>🏆</b><span>'+esc(nomes.join(", "))+'</span></div>';
+    }
+  }catch(e){ /* progresso é cosmético — nunca impede o botão de continuar */ }
+  html += '<button type="button" class="cb-btn" id="continue-box-btn">Continuar a aventura</button>';
+  box.innerHTML = html;
+  box.classList.remove("hidden");
+  el("continue-box-btn").addEventListener("click", function(){ enterPlay(adv.id, adv, true); });
 }
 
 async function refreshHubAdventures(){
@@ -2688,10 +2799,22 @@ async function refreshHubAdventures(){
  list.sort(function(a,b){ return (b.updatedAt||b.createdAt||0)-(a.updatedAt||a.createdAt||0); });
  var emCurso = list.filter(function(a){ return a.status!=="encerrada"; });
  var concluidas = list.filter(function(a){ return a.status==="encerrada"; });
+ // P4 (nova auditoria, seção 21/22): a aventura "ativa" mais recente com
+ // algum progresso já registrado (objetivo, próximo passo ou resumo de
+ // sessão) vira o cartão de destaque "Continuar de onde parei" — o
+ // ponto principal de entrada do hub, antes da lista comum. Convites e
+ // aventuras pausadas não entram aqui: o jogador ainda precisa decidir
+ // algo antes de simplesmente continuar.
+ var continueAdv = emCurso.filter(function(a){
+   return a.status==="ativa" &&
+     ((a.estadoNarrativo && (a.estadoNarrativo.objetivo || a.estadoNarrativo.proximoPasso)) || a.ultimaSessaoResumo);
+ })[0] || null;
+ await renderContinueCard(continueAdv);
  var arquivoLimitado = !podeArquivoCompleto(session.email) && concluidas.length > LIMITE_ARQUIVO_GRATUITO;
  list = emCurso.concat(arquivoLimitado ? concluidas.slice(0, LIMITE_ARQUIVO_GRATUITO) : concluidas);
+ if(continueAdv) list = list.filter(function(a){ return a.id!==continueAdv.id; });
  var box = el("hub-adv-list");
- if(!list.length){ box.innerHTML = '<p class="empty-hint">Você ainda não tem aventuras. Crie uma acima.</p>'; return; }
+ if(!list.length){ box.innerHTML = continueAdv ? "" : '<p class="empty-hint">Você ainda não tem aventuras. Crie uma acima.</p>'; return continueAdv?1:0; }
  // Fase 3: aventuras em grupo "ativas" podem ficar travadas esperando a
  // resposta de alguém, se ninguém tiver a cena aberta quando o prazo
  // vence (a resolução automática só roda dentro da própria cena — ver
@@ -2728,7 +2851,7 @@ async function refreshHubAdventures(){
  else refreshHubAdventures();
  });
  });
-  return list.length;
+  return list.length + (continueAdv?1:0);
 }
 
 function maybeActivateAdventure(adv){
@@ -2876,7 +2999,7 @@ async function refreshLobby(preloaded){
 /* =========================================================
  PLAY (adventure in progress)
  ========================================================= */
-async function enterPlay(advId, preloaded){
+async function enterPlay(advId, preloaded, skipWelcomeToast){
  var bloq = await bloqueadoPorProducao();
  if(bloq){ alert(bloq); return; }
  currentAdvId = advId; gameMode="play";
@@ -2910,7 +3033,7 @@ async function enterPlay(advId, preloaded){
    xp: (character && character.experiencia) || 0,
    inimigosDerrotados: (eventLogAtual && eventLogAtual.inimigosDerrotados) || 0
  };
- mostrarBoasVindasDeVolta(adv);
+ mostrarBoasVindasDeVolta(skipWelcomeToast ? null : adv);
  ligarListenersDaAventura();
 }
 var sessaoBase = null;
@@ -3042,6 +3165,78 @@ async function loadPartyCache(force){
  partyCache = next;
 }
 
+/* =========================================================
+ P3 (nova auditoria, seção 19 — "presença" e "digitando"):
+ cada jogador só escreve a PRÓPRIA chave de presença/digitação
+ (uma por dono, nunca uma chave compartilhada por vários
+ escritores), então não existe aqui o risco de leitura-
+ modificação-gravação simultânea que a auditoria apontou no
+ Event Log (seção 5) — mesmo cuidado já seguido pelas fichas de
+ personagem, uma por dono, desde sempre.
+ ========================================================= */
+var partyPresence = {}; // email -> timestamp da última vez visto na cena
+var partyPresenceAt = 0;
+var lastPresenceSentAt = 0;
+var partyTyping = {};   // email -> timestamp de quando começou a digitar
+var partyTypingAt = 0;
+var lastPeerTypingSentAt = 0;
+
+async function sendPresenceHeartbeat(){
+ if(!currentAdv || currentAdv.mode!=="grupo" || !currentSceneId) return;
+ if(typeof document!=="undefined" && document.hidden) return; // aba em segundo plano não conta como "online"
+ if((Date.now()-lastPresenceSentAt) < PRESENCE_HEARTBEAT_MS) return;
+ lastPresenceSentAt = Date.now();
+ try{ await sSet("presence:"+currentAdvId+":"+currentSceneId+":"+session.email, Date.now(), true); }catch(e){}
+}
+async function loadPartyPresence(force){
+ if(!currentAdv || currentAdv.mode!=="grupo" || !currentSceneId){ partyPresence = {}; return; }
+ if(!force && (Date.now()-partyPresenceAt) < 20000) return;
+ partyPresenceAt = Date.now();
+ var others = (currentAdv.members||[]).filter(function(m){ return m.status==="confirmado" && m.email!==session.email; });
+ var results = await Promise.all(others.map(function(m){
+ return sGet("presence:"+currentAdvId+":"+currentSceneId+":"+m.email, true).then(function(ts){ return {email:m.email, ts:ts}; });
+ }));
+ var next = {};
+ results.forEach(function(r){ if(r.ts) next[r.email] = r.ts; });
+ partyPresence = next;
+}
+function estaOnlineAgora(email){
+ var ts = partyPresence[email];
+ return !!ts && (Date.now()-ts) < PRESENCE_ONLINE_WINDOW_MS;
+}
+
+async function sendPeerTypingSignal(){
+ if(!currentAdv || currentAdv.mode!=="grupo" || !currentSceneId) return;
+ if((Date.now()-lastPeerTypingSentAt) < PEER_TYPING_WRITE_MS) return;
+ lastPeerTypingSentAt = Date.now();
+ try{ await sSet("typing:"+currentAdvId+":"+currentSceneId+":"+session.email, Date.now(), true); }catch(e){}
+}
+async function loadPartyTyping(force){
+ if(!currentAdv || currentAdv.mode!=="grupo" || !currentSceneId){ partyTyping = {}; renderPeerTyping(); return; }
+ if(!force && (Date.now()-partyTypingAt) < 5000) return;
+ partyTypingAt = Date.now();
+ var others = (currentAdv.members||[]).filter(function(m){ return m.status==="confirmado" && m.email!==session.email; });
+ var results = await Promise.all(others.map(function(m){
+ return sGet("typing:"+currentAdvId+":"+currentSceneId+":"+m.email, true).then(function(ts){ return {email:m.email, ts:ts}; });
+ }));
+ var next = {};
+ results.forEach(function(r){ if(r.ts && (Date.now()-r.ts) < PEER_TYPING_SHOW_WINDOW_MS) next[r.email] = r.ts; });
+ partyTyping = next;
+ renderPeerTyping();
+}
+function renderPeerTyping(){
+ var box = el("peer-typing-pill");
+ if(!box) return;
+ var quemDigita = Object.keys(partyTyping);
+ if(!quemDigita.length){ box.classList.add("hidden"); box.textContent=""; return; }
+ var nomes = quemDigita.map(function(em){ return nomeDoMembro(em); });
+ var texto = nomes.length===1
+   ? (nomes[0]+" está digitando…")
+   : (nomes.slice(0,-1).join(", ")+" e "+nomes[nomes.length-1]+" estão digitando…");
+ box.textContent = texto;
+ box.classList.remove("hidden");
+}
+
 var refreshInFlight = false;
 async function refreshPlay(force){
  if(view!=="game" || gameMode!=="play") return;
@@ -3093,6 +3288,9 @@ async function refreshPlayInner(force){
  return;
  }
  loadPartyCache(); // slow-moving data; refreshes in the background
+ loadPartyPresence();
+ loadPartyTyping();
+ sendPresenceHeartbeat();
 
  renderSkillCheck(await checkP);
 
@@ -3155,14 +3353,14 @@ var lastTypingAt = 0;
 function myActionDeadline(pending){
  if(!pending) return 0;
  var seen = (pending.seenAt && pending.seenAt[session.email]) || pending.requestedAt || Date.now();
- var base = seen + ACTION_WINDOW_MS;
+ var base = seen + actionWindowFor(pending);
  // typing in the last few seconds keeps the window open a bit longer
  if(lastTypingAt && (Date.now()-lastTypingAt) < 10000) base = Math.max(base, Date.now()+TYPING_GRACE_MS);
  return base;
 }
 function playerDeadline(pending, email){
  var seen = (pending.seenAt && pending.seenAt[email]) || pending.requestedAt || Date.now();
- return seen + ACTION_WINDOW_MS;
+ return seen + actionWindowFor(pending);
 }
 function renderTimerPill(){
  if(view!=="game" || gameMode!=="play"){ return; }
@@ -3172,14 +3370,45 @@ function renderTimerPill(){
  var amExpected = pending.expectedEmails && pending.expectedEmails.indexOf(session.email)>=0;
  if(!amExpected || iResponded){ el("timer-pill").classList.add("hidden"); return; }
  var remain = myActionDeadline(pending) - Date.now();
+ // P3 (nova auditoria, seção 18 — botão "[Assumir ação automática]"):
+ // só o próprio jogador esperado pode adiantar a própria vez — nunca
+ // outro jogador da cena por ele, pra não virar uma forma de apressar
+ // ou constranger quem está pensando com calma.
+ var pularBtn = '<button type="button" id="pular-minha-vez" class="pular-vez-btn">Deixar o Mestre decidir agora</button>';
  if(remain>0){
  el("timer-pill").classList.remove("hidden");
  el("timer-pill").classList.toggle("calm", remain>60000);
- el("timer-pill").innerHTML = "⏱ Responda em "+fmtClock(remain)+(remain<=60000?" — o Mestre decidirá por você se o tempo acabar":"");
+ el("timer-pill").innerHTML = "⏱ Responda em "+fmtClock(remain)+(remain<=60000?" — o Mestre decidirá por você se o tempo acabar":"")+pularBtn;
  } else {
  el("timer-pill").classList.remove("hidden"); el("timer-pill").classList.add("calm");
- el("timer-pill").innerHTML = "⏱ Tempo esgotado — o Mestre decidirá por você";
+ el("timer-pill").innerHTML = "⏱ Tempo esgotado — o Mestre decidirá por você"+pularBtn;
  }
+}
+el("timer-pill").addEventListener("click", function(ev){
+ if(ev.target && ev.target.id==="pular-minha-vez") pularMinhaVezAgora();
+});
+async function pularMinhaVezAgora(){
+ if(loading) return;
+ var advId=currentAdvId, sceneId=currentSceneId;
+ if(!advId || !sceneId) return;
+ if(!confirm("O Mestre vai escolher uma ação razoável para você agora, com base na sua ficha e na cena. Prefere continuar sem esperar?")) return;
+ var pendKey = "pending-action:"+advId+":"+sceneId;
+ var pending = await sGet(pendKey, true);
+ if(!pending || !pending.expectedEmails || pending.expectedEmails.indexOf(session.email)<0) return;
+ if(pending.respondedEmails && pending.respondedEmails.indexOf(session.email)>=0) return;
+ loading = true; updateSendUI(); showTyping(true);
+ try{
+ await appendSceneMessages(advId, sceneId, [{role:"user", authorEmail:session.email, authorName:session.name, text:"[O jogador "+(session.name||session.email)+" preferiu não esperar e pediu para você escolher uma ação razoável para ele agora, com base em sua ficha e na cena atual.]", ts:Date.now(), display:false, kind:"system"}]);
+ var fresh = await sGet(pendKey, true);
+ if(fresh && fresh.expectedEmails && fresh.expectedEmails.indexOf(session.email)>=0){
+ if(!fresh.respondedEmails) fresh.respondedEmails=[];
+ if(fresh.respondedEmails.indexOf(session.email)===-1) fresh.respondedEmails.push(session.email);
+ if(fresh.respondedEmails.length>=fresh.expectedEmails.length){ await sDel(pendKey, true); }
+ else await sSet(pendKey, fresh, true);
+ }
+ await runGmTurn(advId, sceneId);
+ }catch(e){ console.warn("Falha ao pular a vez:", e); }
+ finally{ loading=false; showTyping(false); updateSendUI(); }
 }
 setInterval(function(){ if(view==="game" && gameMode==="play") renderTimerPill(); }, 1000);
 
@@ -4387,8 +4616,11 @@ async function runGmTurn(advId, sceneId){
  var sceneNow = (freshAdv.scenes||[]).filter(function(sc){ return sc.id===(freshAdv.activeSceneId||sceneId); })[0];
  var sceneMemberCount = sceneNow ? sceneNow.memberEmails.length : 1;
  if(data.aguardandoAcao && expectedRaw.length && sceneMemberCount>1){
+ var URGENCIAS_VALIDAS = {combate:1, exploracao:1, social:1};
+ var urgencia = URGENCIAS_VALIDAS[data.urgenciaAcao] ? data.urgenciaAcao : null;
+ var janela = urgencia ? ACTION_WINDOW_BY_URGENCIA[urgencia] : ACTION_WINDOW_MS;
  await sSet("pending-action:"+advId+":"+(freshAdv.activeSceneId||sceneId), {
- requestedAt:Date.now(), deadline:Date.now()+ACTION_WINDOW_MS, expectedEmails:expectedRaw, respondedEmails:[]
+ requestedAt:Date.now(), deadline:Date.now()+janela, expectedEmails:expectedRaw, respondedEmails:[], urgencia:urgencia
  }, true);
  } else {
  await sDel("pending-action:"+advId+":"+(freshAdv.activeSceneId||sceneId), true);
@@ -4520,7 +4752,7 @@ function showTyping(on){
 function updateSendUI(){ el("chat-send").disabled = loading; el("chat-input").disabled = loading; }
 
 var chatInput = el("chat-input");
-chatInput.addEventListener("input", function(){ lastTypingAt = Date.now(); chatInput.style.height="auto"; chatInput.style.height=Math.min(130,chatInput.scrollHeight)+"px"; });
+chatInput.addEventListener("input", function(){ lastTypingAt = Date.now(); sendPeerTypingSignal(); chatInput.style.height="auto"; chatInput.style.height=Math.min(130,chatInput.scrollHeight)+"px"; });
 chatInput.addEventListener("keydown", function(e){ if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); el("chat-form").dispatchEvent(new Event("submit",{cancelable:true})); } });
 /* ---- Comandos rápidos do chat: atalhos locais, nunca chegam ao Mestre ---- */
 function tratarComandoRapido(texto){
