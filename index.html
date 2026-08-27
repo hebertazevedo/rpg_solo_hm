@@ -276,6 +276,12 @@ a{color:var(--arcane-bright);}
 .local-chip{display:inline-block;padding:1px 6px;border-radius:999px;font-size:10px;font-weight:600;background:var(--void-3);border:1px solid var(--line);color:var(--text-hi);}
 .local-chip.sob-ameaca{border-color:#d9534f;color:#f0a8a8;}
 .local-chip.segura{border-color:#4caf6f;color:#8fe0a8;}
+.faccao-chip{display:inline-block;padding:1px 6px;border-radius:999px;font-size:10px;font-weight:600;background:var(--void-3);border:1px solid var(--line);color:var(--text-hi);}
+.faccao-chip.aliada{border-color:#4caf6f;color:#8fe0a8;}
+.faccao-chip.hostil{border-color:#d9534f;color:#f0a8a8;}
+.faccao-chip.neutra{border-color:var(--brass-dim);color:var(--brass-bright);}
+.mission-ganchos li.mission-misterio::before{content:"";}
+.mission-ganchos li.mission-decisao::before{content:"";}
 .mission-text{min-width:0;display:flex;flex-direction:column;gap:1px;flex:1;}
 .mission-text b{font-size:12.5px;color:var(--text-hi);font-weight:600;}
 .mission-text span{font-size:11px;color:var(--text-lo);}
@@ -845,7 +851,7 @@ a{color:var(--arcane-bright);}
        <b id="mission-objetivo"></b>
        <span id="mission-proximo"></span>
      </div>
-     <button type="button" class="mission-toggle hidden" id="mission-toggle" aria-label="Ver ganchos, NPCs e locais">▾</button>
+     <button type="button" class="mission-toggle hidden" id="mission-toggle" aria-label="Ver ganchos, mistérios, NPCs, locais, facções e decisões">▾</button>
    </div>
    <ul id="mission-ganchos" class="mission-ganchos hidden"></ul>
  </div>
@@ -2153,11 +2159,11 @@ FICHA_START+"\n{ ...JSON... }\n"+FICHA_END+"\n\n" +
 ' "magiasPerdidas": [{"email": string, "magias": [string]}],\n'+
 ' "periciasTreinadas": [{"email": string, "pericias": [{"nome": string, "posto": "treinado"|"especialista"|"mestre"|"lendario"}]}],\n'+
 ' "eventos": [{"tipo": "COMBATE_FINALIZADO", "inimigosDerrotados": number}],\n'+
-' "estadoNarrativo": {"objetivo": string|null, "proximoPasso": string|null, "ganchosAtivos": [string], "missaoStatus": "ativa"|"concluida"|"falhou"|"abandonada", "npcs": [{"nome": string, "relacao": "aliada"|"neutra"|"hostil"|"desconhecida", "estado": "viva"|"morta"|"desaparecida"}], "locais": [{"nome": string, "situacao": "segura"|"sob-ameaca"|"desconhecida"}]}\n'+
+' "estadoNarrativo": {"objetivo": string|null, "proximoPasso": string|null, "ganchosAtivos": [string], "misterios": [string], "missaoStatus": "ativa"|"concluida"|"falhou"|"abandonada", "npcs": [{"nome": string, "relacao": "aliada"|"neutra"|"hostil"|"desconhecida", "estado": "viva"|"morta"|"desaparecida"}], "locais": [{"nome": string, "situacao": "segura"|"sob-ameaca"|"desconhecida"}], "faccoes": [{"nome": string, "relacao": "aliada"|"neutra"|"hostil"|"desconhecida"}], "decisoesTomadas": [string]}\n'+
 "}\n\n" +
 (isGroup
  ? "Regras críticas: 1) \"cenas\" deve sempre listar TODOS os jogadores confirmados da aventura, cada um em exatamente uma cena — nunca esqueça ninguém. 2) \"fichas\" deve sempre incluir a ficha atual de TODOS os membros da cena ativa (mesmo sem mudanças), com \"experiencia\" refletindo o total acumulado. "
- : "Regras críticas: 1) Não existem cenas nem outros jogadores nesta aventura. 2) \"fichas\" deve conter a ficha atual do jogador (mesmo sem mudanças), com \"experiencia\" refletindo o total acumulado. ") + "3) NUNCA altere a identidade de um personagem: nome, ancestralidade, linhagem, antecedente e classe são definidos pelo jogador na criação e devem ser repetidos exatamente como estão. Se você não souber o valor de um campo, repita o valor anterior em vez de inventar ou deixar em branco. Nunca reduza o nível nem a experiência de um personagem. 4) INVENTÁRIO, MAGIAS E PERÍCIAS: o aplicativo controla as listas \"equipamento\", \"magias\" e \"pericias\" — o que você escrever nesses arrays é IGNORADO. Os modificadores de perícia são calculados automaticamente pelo aplicativo (nível + proficiência + atributo); NUNCA calcule, informe ou corrija modificadores, e nunca repita a ficha no chat. Para treinar o personagem numa perícia nova ou elevar seu posto, use \"periciasTreinadas\". Para dar ou tirar um item, ou ensinar/remover uma magia, use exclusivamente \"itensGanhos\", \"itensPerdidos\", \"magiasAprendidas\" e \"magiasPerdidas\", listando apenas o que mudou NESTE turno (arrays vazios quando nada mudou). Nunca remova algo do inventário do jogador sem um motivo narrado explicitamente na cena. 5) \"xpConcedido\" lista apenas o XP ganho NESTE turno (array vazio quando não houve ganho). 6) \"eventos\": toda vez que um combate desta cena terminar NESTE turno (todos os inimigos derrotados, fugiram ou se renderam), inclua um item {\"tipo\":\"COMBATE_FINALIZADO\",\"inimigosDerrotados\":N} com a contagem exata de inimigos derrotados nesse combate (0 se ninguém morreu, ex.: fuga ou rendição). Não repita esse evento em turnos seguintes do mesmo combate, nem invente combates que não aconteceram. Nunca inclua eventos de outro tipo — críticos e falhas são controlados pelo próprio aplicativo, não pela narrativa. Array vazio quando não houve conclusão de combate neste turno. 7) \"estadoNarrativo\": mantenha sempre atualizado o objetivo atual da aventura (\"objetivo\", uma frase curta, ex.: \"Descobrir quem sabotou as caravanas\"), o próximo passo sugerido (\"proximoPasso\", ex.: \"Falar com o ferreiro sobre as marcas na ferradura\") e uma lista curta de ganchos de história ainda em aberto (\"ganchosAtivos\", no máximo 5 frases curtas). Repita os mesmos valores em turnos onde nada mudou; atualize \"objetivo\" só quando a missão principal genuinamente mudar, e \"proximoPasso\" a cada vez que a situação avançar. \"missaoStatus\" deve ser \"ativa\" na maior parte do jogo, e só virar \"concluida\", \"falhou\" ou \"abandonada\" quando isso genuinamente acontecer na narrativa (depois disso, se surgir um novo objetivo, volte a \"ativa\" com um novo \"objetivo\"). \"npcs\" é uma lista curta (no máximo 8) dos NPCs importantes já conhecidos pelo jogador nesta aventura, cada um com nome, relação com o jogador e se ainda está vivo — repita a lista inteira a cada turno, atualizando só quem de fato mudou. Isso é usado pelo aplicativo para lembrar o jogador onde parou, então nunca deixe em branco depois do primeiro turno da aventura. \"locais\" é uma lista curta (no máximo 8) dos lugares importantes já descobertos pelo jogador nesta aventura (cidades, ruínas, covis, o que fizer sentido na história), cada um com nome e situação atual (\"segura\", \"sob-ameaca\" ou \"desconhecida\" quando não houver informação clara) — repita a lista inteira a cada turno, adicionando um lugar novo só na primeira vez que o jogador genuinamente o descobrir ou chegar nele, e atualizando a situação de um lugar já conhecido quando ela mudar na narrativa. Nunca invente locais que o jogador ainda não visitou nem ouviu falar. 8) O bloco deve conter apenas JSON válido, uma única vez, sempre ao final.";
+ : "Regras críticas: 1) Não existem cenas nem outros jogadores nesta aventura. 2) \"fichas\" deve conter a ficha atual do jogador (mesmo sem mudanças), com \"experiencia\" refletindo o total acumulado. ") + "3) NUNCA altere a identidade de um personagem: nome, ancestralidade, linhagem, antecedente e classe são definidos pelo jogador na criação e devem ser repetidos exatamente como estão. Se você não souber o valor de um campo, repita o valor anterior em vez de inventar ou deixar em branco. Nunca reduza o nível nem a experiência de um personagem. 4) INVENTÁRIO, MAGIAS E PERÍCIAS: o aplicativo controla as listas \"equipamento\", \"magias\" e \"pericias\" — o que você escrever nesses arrays é IGNORADO. Os modificadores de perícia são calculados automaticamente pelo aplicativo (nível + proficiência + atributo); NUNCA calcule, informe ou corrija modificadores, e nunca repita a ficha no chat. Para treinar o personagem numa perícia nova ou elevar seu posto, use \"periciasTreinadas\". Para dar ou tirar um item, ou ensinar/remover uma magia, use exclusivamente \"itensGanhos\", \"itensPerdidos\", \"magiasAprendidas\" e \"magiasPerdidas\", listando apenas o que mudou NESTE turno (arrays vazios quando nada mudou). Nunca remova algo do inventário do jogador sem um motivo narrado explicitamente na cena. 5) \"xpConcedido\" lista apenas o XP ganho NESTE turno (array vazio quando não houve ganho). 6) \"eventos\": toda vez que um combate desta cena terminar NESTE turno (todos os inimigos derrotados, fugiram ou se renderam), inclua um item {\"tipo\":\"COMBATE_FINALIZADO\",\"inimigosDerrotados\":N} com a contagem exata de inimigos derrotados nesse combate (0 se ninguém morreu, ex.: fuga ou rendição). Não repita esse evento em turnos seguintes do mesmo combate, nem invente combates que não aconteceram. Nunca inclua eventos de outro tipo — críticos e falhas são controlados pelo próprio aplicativo, não pela narrativa. Array vazio quando não houve conclusão de combate neste turno. 7) \"estadoNarrativo\": mantenha sempre atualizado o objetivo atual da aventura (\"objetivo\", uma frase curta, ex.: \"Descobrir quem sabotou as caravanas\"), o próximo passo sugerido (\"proximoPasso\", ex.: \"Falar com o ferreiro sobre as marcas na ferradura\") e uma lista curta de ganchos de história ainda em aberto (\"ganchosAtivos\", no máximo 5 frases curtas). Repita os mesmos valores em turnos onde nada mudou; atualize \"objetivo\" só quando a missão principal genuinamente mudar, e \"proximoPasso\" a cada vez que a situação avançar. \"missaoStatus\" deve ser \"ativa\" na maior parte do jogo, e só virar \"concluida\", \"falhou\" ou \"abandonada\" quando isso genuinamente acontecer na narrativa (depois disso, se surgir um novo objetivo, volte a \"ativa\" com um novo \"objetivo\"). \"npcs\" é uma lista curta (no máximo 8) dos NPCs importantes já conhecidos pelo jogador nesta aventura, cada um com nome, relação com o jogador e se ainda está vivo — repita a lista inteira a cada turno, atualizando só quem de fato mudou. Isso é usado pelo aplicativo para lembrar o jogador onde parou, então nunca deixe em branco depois do primeiro turno da aventura. \"locais\" é uma lista curta (no máximo 8) dos lugares importantes já descobertos pelo jogador nesta aventura (cidades, ruínas, covis, o que fizer sentido na história), cada um com nome e situação atual (\"segura\", \"sob-ameaca\" ou \"desconhecida\" quando não houver informação clara) — repita a lista inteira a cada turno, adicionando um lugar novo só na primeira vez que o jogador genuinamente o descobrir ou chegar nele, e atualizando a situação de um lugar já conhecido quando ela mudar na narrativa. Nunca invente locais que o jogador ainda não visitou nem ouviu falar. \"misterios\" é uma lista curta (no máximo 5) de perguntas ainda sem resposta que a história já levantou mas não explicou (diferente de \"ganchosAtivos\", que são próximos passos de ação; um mistério é uma pergunta em aberto, ex.: \"quem realmente mandou a carta anônima?\") — repita a lista inteira a cada turno, e remova um mistério só quando a narrativa genuinamente o responder. \"faccoes\" é uma lista curta (no máximo 6) dos grupos, organizações ou facções importantes já conhecidos nesta aventura (uma guilda, uma ordem religiosa, um bando, uma casa nobre), cada uma com nome e a relação atual com o jogador (\"aliada\", \"neutra\", \"hostil\" ou \"desconhecida\") — repita a lista inteira a cada turno, igual aos NPCs. \"decisoesTomadas\" lista apenas as decisões importantes e irreversíveis que o jogador tomou NESTE turno (array vazio na maioria dos turnos) — frases curtas e objetivas, ex.: \"Poupou a vida do bandido capturado\" ou \"Aceitou a proposta do Barão Negro\"; use só para escolhas que realmente definem rumos da história, nunca para ações rotineiras de combate ou exploração. 8) O bloco deve conter apenas JSON válido, uma única vez, sempre ao final.";
 }
 
 function buildCreationSystemPrompt(){
@@ -3315,6 +3321,15 @@ function contarInimigosDerrotadosRegex(msgs){
  NPC_INTRODUZIDO, agora para lugares. LOCAL_DESCOBERTO só é emitido pelo
  app quando compara a lista de estadoNarrativo.locais com a anterior e
  encontra um nome novo — a IA nunca dispara esse evento diretamente.
+ P2 (continuação — seção 11 "facções" e seção 12 "memória"):
+ FACCAO_INTRODUZIDA segue exatamente o mesmo padrão comparativo de
+ NPC_INTRODUZIDO/LOCAL_DESCOBERTO. DECISAO_REGISTRADA é diferente: aqui
+ a IA de fato declara o conteúdo (o texto da decisão, em
+ "decisoesTomadas"), porque só quem narra sabe qual escolha foi feita —
+ mas o campo é estritamente aditivo (a IA só lista o que aconteceu NESTE
+ turno, nunca reescreve ou apaga o histórico) e o app trunca/sanitiza o
+ texto antes de gravar, a mesma tolerância a risco já aceita para
+ ITEM_GANHO e MAGIA_APRENDIDA.
  ========================================================= */
 var EVENT_LOG_MAX = 300;
 var TIPOS_EVENTO_VALIDOS = {
@@ -3330,13 +3345,16 @@ var TIPOS_EVENTO_VALIDOS = {
   "CENA_MUDOU": true,
   "MISSAO_STATUS_MUDOU": true,
   "NPC_INTRODUZIDO": true,
-  "LOCAL_DESCOBERTO": true
+  "LOCAL_DESCOBERTO": true,
+  "FACCAO_INTRODUZIDA": true,
+  "DECISAO_REGISTRADA": true
 };
 function eventLogVazio(){
   return {
     inimigosDerrotados:0, combatesFinalizados:0, criticos:0, falhasCriticas:0,
     xpTotal:0, itensGanhos:0, itensPerdidos:0, magiasAprendidas:0,
     descansos:0, niveisAlcancados:0, locaisDescobertos:0,
+    faccoesIntroduzidas:0, decisoesRegistradas:0,
     eventos:[], updatedAt:Date.now()
   };
 }
@@ -3427,6 +3445,12 @@ function aplicarEventosNoLog(log, validos, sceneId, origem){
     } else if(e.tipo==="LOCAL_DESCOBERTO"){
       log.locaisDescobertos += 1;
       entry.nome = String(e.nome||"").slice(0,80);
+    } else if(e.tipo==="FACCAO_INTRODUZIDA"){
+      log.faccoesIntroduzidas += 1;
+      entry.nome = String(e.nome||"").slice(0,80);
+    } else if(e.tipo==="DECISAO_REGISTRADA"){
+      log.decisoesRegistradas += 1;
+      entry.texto = String(e.texto||"").slice(0,200);
     }
     log.eventos.push(entry);
   });
@@ -3506,7 +3530,12 @@ function showAchievementToast(def){
    mesmo painel expansível dos ganchos — a "agenda da aventura".
    P2 (nova auditoria, seção 11 — "Mundo"): o mesmo painel ganhou também
    os locais já descobertos pelo jogador, com um chip por situação
-   (segura / sob ameaça / desconhecida), mesmo padrão dos NPCs. */
+   (segura / sob ameaça / desconhecida), mesmo padrão dos NPCs.
+   P2 (continuação — "facções" e "memória"): o painel ganhou mais três
+   blocos: mistérios (perguntas em aberto, mesmo estilo dos ganchos),
+   facções (chip por relação, mesmo padrão dos NPCs) e as últimas
+   decisões importantes registradas (histórico permanente, só mostra
+   as mais recentes para não crescer sem limite visual). */
 var STATUS_MISSAO_INFO = {
   ativa:      {cor:"#e8b649", label:"Ativa"},
   concluida:  {cor:"#4caf6f", label:"Concluída"},
@@ -3515,6 +3544,8 @@ var STATUS_MISSAO_INFO = {
 };
 var LABEL_RELACAO_NPC = {aliada:"aliada", neutra:"neutra", hostil:"hostil", desconhecida:"desconhecida"};
 var LABEL_SITUACAO_LOCAL = {segura:"segura", "sob-ameaca":"sob ameaça", desconhecida:"desconhecida"};
+var LABEL_RELACAO_FACCAO = {aliada:"aliada", neutra:"neutra", hostil:"hostil", desconhecida:"desconhecida"};
+var DECISOES_VISIVEIS = 5;
 function atualizarMissaoAtual(adv){
   var bar = el("mission-bar");
   if(!bar) return;
@@ -3531,11 +3562,17 @@ function atualizarMissaoAtual(adv){
   // no mesmo painel expansível de NPCs e ganchos, como chips coloridos
   // pela situação atual (mesmo padrão visual dos NPCs por relação).
   var locais = Array.isArray(en.locais) ? en.locais.filter(Boolean) : [];
+  var misterios = Array.isArray(en.misterios) ? en.misterios.filter(Boolean) : [];
+  var faccoes = Array.isArray(en.faccoes) ? en.faccoes.filter(Boolean) : [];
+  var decisoes = Array.isArray(en.decisoes) ? en.decisoes.filter(Boolean) : [];
   var toggle = el("mission-toggle"), lista = el("mission-ganchos");
-  if(ganchos.length || npcs.length || locais.length){
+  if(ganchos.length || npcs.length || locais.length || misterios.length || faccoes.length || decisoes.length){
     toggle.classList.remove("hidden");
     var html = "";
     if(ganchos.length) html += ganchos.map(function(g){ return "<li>"+esc(g)+"</li>"; }).join("");
+    if(misterios.length){
+      html += misterios.map(function(m){ return '<li class="mission-misterio">❓ '+esc(m)+"</li>"; }).join("");
+    }
     if(npcs.length){
       html += npcs.map(function(n){
         var relLabel = LABEL_RELACAO_NPC[n.relacao] || "desconhecida";
@@ -3548,6 +3585,15 @@ function atualizarMissaoAtual(adv){
         var sitLabel = LABEL_SITUACAO_LOCAL[l.situacao] || "desconhecida";
         return '<li><span class="local-chip '+esc(l.situacao||"desconhecida")+'">📍 '+esc(l.nome)+"</span> — "+esc(sitLabel)+"</li>";
       }).join("");
+    }
+    if(faccoes.length){
+      html += faccoes.map(function(fc){
+        var relLabel = LABEL_RELACAO_FACCAO[fc.relacao] || "desconhecida";
+        return '<li><span class="faccao-chip '+esc(fc.relacao||"desconhecida")+'">🛡️ '+esc(fc.nome)+"</span> — "+esc(relLabel)+"</li>";
+      }).join("");
+    }
+    if(decisoes.length){
+      html += decisoes.slice(-DECISOES_VISIVEIS).map(function(d){ return '<li class="mission-decisao">📜 '+esc(d)+"</li>"; }).join("");
     }
     lista.innerHTML = html;
   } else {
@@ -4289,8 +4335,41 @@ async function runGmTurn(advId, sceneId){
        })
      : locaisAnteriores;
    locais.forEach(function(l){ if(!nomesLocaisAntes[normaliza(l.nome)]) eventosMotor.push({tipo:"LOCAL_DESCOBERTO", nome:l.nome}); });
-   if(objetivo || proximoPasso || ganchosAtivos.length || npcs.length || locais.length){
-     freshAdv.estadoNarrativo = { objetivo: objetivo, proximoPasso: proximoPasso, ganchosAtivos: ganchosAtivos, missaoStatus: missaoStatus, npcs: npcs, locais: locais, atualizadoEm: Date.now() };
+   // P2 (continuação) — mistérios: mesmo padrão de ganchosAtivos (a IA
+   // repete a lista inteira a cada turno; some da tela quando a própria
+   // IA para de repeti-lo, ou seja, quando a narrativa o resolveu). Não
+   // gera evento próprio — é texto solto como os ganchos, não um dado
+   // estruturado que o motor valide.
+   var misterios = Array.isArray(en.misterios)
+     ? en.misterios.filter(function(m){ return typeof m==="string" && m.trim(); }).map(function(m){ return m.trim().slice(0,160); }).slice(0,5)
+     : [];
+   // Facções: mesma lógica comparativa dos NPCs e locais.
+   var RELACOES_FACCAO_VALIDAS = {aliada:1, neutra:1, hostil:1, desconhecida:1};
+   var faccoesAnteriores = (freshAdv.estadoNarrativo && Array.isArray(freshAdv.estadoNarrativo.faccoes)) ? freshAdv.estadoNarrativo.faccoes : [];
+   var nomesFaccoesAntes = {}; faccoesAnteriores.forEach(function(fc){ nomesFaccoesAntes[normaliza(fc.nome)] = true; });
+   var faccoes = Array.isArray(en.faccoes)
+     ? en.faccoes.filter(function(fc){ return fc && typeof fc.nome==="string" && fc.nome.trim(); }).slice(0,6).map(function(fc){
+         return {
+           nome: fc.nome.trim().slice(0,80),
+           relacao: RELACOES_FACCAO_VALIDAS[fc.relacao] ? fc.relacao : "desconhecida"
+         };
+       })
+     : faccoesAnteriores;
+   faccoes.forEach(function(fc){ if(!nomesFaccoesAntes[normaliza(fc.nome)]) eventosMotor.push({tipo:"FACCAO_INTRODUZIDA", nome:fc.nome}); });
+   // Decisões importantes: diferente de tudo acima — não é repetida a
+   // cada turno pela IA, é um DELTA (só o que aconteceu NESTE turno),
+   // igual a itensGanhos/magiasAprendidas. O app só acrescenta ao
+   // histórico já salvo (nunca reescreve o que já existia) e mantém um
+   // teto para não crescer sem limite.
+   var DECISOES_MAX = 20;
+   var decisoesAnteriores = (freshAdv.estadoNarrativo && Array.isArray(freshAdv.estadoNarrativo.decisoes)) ? freshAdv.estadoNarrativo.decisoes : [];
+   var decisoesNovas = Array.isArray(en.decisoesTomadas)
+     ? en.decisoesTomadas.filter(function(d){ return typeof d==="string" && d.trim(); }).map(function(d){ return d.trim().slice(0,200); }).slice(0,5)
+     : [];
+   decisoesNovas.forEach(function(d){ eventosMotor.push({tipo:"DECISAO_REGISTRADA", texto:d}); });
+   var decisoes = decisoesNovas.length ? decisoesAnteriores.concat(decisoesNovas).slice(-DECISOES_MAX) : decisoesAnteriores;
+   if(objetivo || proximoPasso || ganchosAtivos.length || npcs.length || locais.length || misterios.length || faccoes.length || decisoes.length){
+     freshAdv.estadoNarrativo = { objetivo: objetivo, proximoPasso: proximoPasso, ganchosAtivos: ganchosAtivos, missaoStatus: missaoStatus, npcs: npcs, locais: locais, misterios: misterios, faccoes: faccoes, decisoes: decisoes, atualizadoEm: Date.now() };
      advChanged = true;
    }
  }
