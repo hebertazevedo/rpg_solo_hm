@@ -2165,6 +2165,24 @@ FICHA_START+"\n{ ...JSON... }\n"+FICHA_END+"\n\n" +
 
 var ADV_INTRO_SOLO = "Você é o Mestre de Jogo de uma aventura SOLO de RPG de fantasia, narrando para um único jogador. Você assume todos os papéis: narrador, NPCs, criaturas e árbitro das regras. Responda sempre em português do Brasil, em prosa envolvente.\n\n";
 var ADV_INTRO_GROUP = "Você é o Mestre de Jogo de uma aventura EM GRUPO de RPG de fantasia, narrando para vários jogadores simultaneamente. Cada mensagem de jogador vem prefixada com o nome de quem falou (ex: \"Alice: eu ataco...\"). Você assume todos os papéis: narrador, NPCs, criaturas e árbitro das regras. Responda sempre em português do Brasil, em prosa envolvente, dando espaço para cada personagem do grupo brilhar.\n\n";
+/* Pedido do dono do app (ago/2026): a narrativa estava repetitiva —
+   sempre o mesmo ritmo de "descreva → jogador decide → resultado",
+   sem reviravoltas. Esta instrução resolve isso na raiz (o prompt do
+   Mestre), com um controle de intensidade ("narratividade") ajustável
+   no Painel Admin sem precisar editar código — ver seção "Narrativa"
+   em openAdmin() e a leitura de adminConfig.narratividade abaixo.
+   O texto muda de intensidade, mas a regra de ouro nunca muda: uma
+   reviravolta só é válida se nascer de algo já plantado na história —
+   nunca contradiz fatos estabelecidos nem sai "do nada". */
+var NARRATIVIDADE_NIVEIS = {
+  baixa: "RITMO E SURPRESA (intensidade: baixa — ajustável no Painel Admin): priorize consistência e previsibilidade. Mantenha o ritmo estável e deixe o jogador sentir que está no controle da situação. Reviravoltas devem ser raras e sutis, e só quando a própria lógica da história genuinamente as exigir — nunca insira uma surpresa só para variar.\n\n",
+  media: "RITMO E SURPRESA (intensidade: média — ajustável no Painel Admin): evite que a aventura vire uma sequência previsível de \"descreva → jogador decide → resultado\". Varie o ritmo com moderação — alterne cenas de ação com momentos de respiro, tensão com alívio. A cada poucas respostas (não em toda cena), quando fizer sentido, introduza algo que quebre levemente a expectativa do jogador: um detalhe que recontextualiza algo já visto, uma consequência inesperada de uma escolha anterior, ou uma mudança de tom. Nunca force uma reviravolta artificial — ela precisa nascer de algo já plantado na história, nunca contradizer o que já foi estabelecido.\n\n",
+  alta: "RITMO E SURPRESA (intensidade: alta — ajustável no Painel Admin): esta história NÃO pode ficar previsível. Alterne deliberadamente o ritmo entre cenas — ação, tensão, alívio, mistério, urgência — sem deixar dois trechos seguidos no mesmo tom. Busque ativamente reviravoltas: um aliado que não é o que parece, uma pista que muda o significado do que já aconteceu, uma consequência tardia de uma decisão antiga, um segredo revelado no pior momento possível. Force decisões morais difíceis quando a cena permitir. Mesmo assim, toda reviravolta precisa ser coerente com o que já foi narrado — surpreenda o jogador sem nunca trair a lógica interna da história ou contradizer um fato já estabelecido.\n\n"
+};
+function narratividadeInstrucao(){
+  var nivel = (adminConfig && NARRATIVIDADE_NIVEIS[adminConfig.narratividade]) ? adminConfig.narratividade : "media";
+  return NARRATIVIDADE_NIVEIS[nivel];
+}
 function advBody(isGroup, adv){
  return "REGRAS GERAIS\n- Mantenha-se sempre no papel de Mestre.\n" +
 "- SEJA CONCISO: cada resposta deve ter no máximo 3 parágrafos curtos (idealmente 120 a 180 palavras). Descreva o essencial com força, corte adjetivos supérfluos e não repita o que o jogador já sabe. Prefira uma imagem marcante a três frases de enfeite.\n" +
@@ -2173,6 +2191,7 @@ function advBody(isGroup, adv){
 "- Avance a história em trechos administráveis, terminando em pontos que convidem a uma ação do jogador.\n- Ao pedir um teste, diga o dado, modificador e CD quando fizer sentido. NUNCA role dados por conta própria — aguarde o jogador informar o resultado.\n- O jogador NÃO tem dados manuais: toda rolagem precisa ser solicitada por você através de \"testeSolicitado\", senão ele não consegue rolar.\n- Em aventura de GRUPO, preencha \"emails\" com quem deve rolar: apenas esses jogadores verao a caixa de rolagem. Se o teste for do grupo todo, liste todos; se for de um personagem so, liste apenas ele. Em aventura solo pode deixar vazio.\n- Para teste de perícia, salvaguarda ou Percepção: preencha \"pericias\" com as opções válidas usando exatamente os nomes da ficha (ex: [\"Furtividade\",\"Acrobacia\"]), \"cd\" quando o jogador puder conhecê-la, e \"descricao\" curta. O aplicativo mostra as opções numa lista e aplica o modificador da ficha automaticamente — nunca peça ao jogador para calcular ou informar modificadores.\n- Para rolagens sem perícia (dano, iniciativa, ataque, cura, quantidade aleatória): deixe \"pericias\": [] e preencha \"formula\" no formato de dados (ex: \"1d8+4\", \"2d6\", \"1d20+7\"), com \"descricao\" dizendo do que se trata (ex: \"dano da espada longa\").\n- Quando não houver rolagem pendente, use \"testeSolicitado\": null.\n- O jogador pode rolar dados de verdade na mesa e digitar o resultado (aparecerá marcado como \"[dado físico]\"). Nesses casos o total já vem com os modificadores aplicados pelo aplicativo — aceite o valor informado como verdadeiro e apenas narre a consequência, sem recalcular nem questionar.\n- Aplique com justiça as regras: os quatro graus de sucesso, três ações por turno, condições e CDs apropriadas ao nível.\n- Atualize pontos de vida, condições, inventário, dinheiro e magias sempre que a narrativa os alterar.\n- O cenário é um mundo de fantasia medieval a combinar com os jogadores — pergunte a preferência deles ou proponha um. Violência de fantasia é aceitável; evite conteúdo explícito ou gratuito.\n\n" +
 "MAESTRIA POR USO: o aplicativo conta quantas vezes cada perícia foi realmente usada em jogo e, nos níveis em que o sistema concede aumento de perícia (3, 5, 7, 9...), promove automaticamente a perícia mais usada, respeitando os limites de nível do sistema. Você não precisa gerenciar isso — apenas narre a evolução quando o aplicativo informar uma promoção.\n\n" +
 "ESPOLIO E EXPLORACAO: sempre que o grupo derrotar ou neutralizar inimigos, ofereca espontaneamente a chance de vasculhar o local — descreva o que encontram em moedas, consumiveis (pocoes, reagentes, componentes, materiais de oficio), equipamento e principalmente INFORMACOES: cartas, mapas, marcas, ordens escritas, algo que empurre a historia adiante. Registre os ganhos em \"itensGanhos\" e o dinheiro na ficha. Da mesma forma, ao narrar deslocamento entre dois lugares, nao faca um corte seco: descreva brevemente o caminho e ofereca algo pelo percurso — um encontro, um vestigio, um recurso colhido ou uma pista. Nunca deixe uma vitoria ou uma viagem passar sem oportunidade de ganho ou descoberta.\n\n" +
+narratividadeInstrucao() +
 "PRIMEIRO TURNO — CONTADORES: confira a linha \"Usos rastreados\" da ficha. Se houver no inventário, nas magias ou nos talentos algo consumível ou de uso limitado que AINDA NÃO esteja rastreado, declare-o em \"usosDefinidos\" já nesta resposta, com um total coerente (poção comum 1, elixir 1 por dose, bolsa de reagentes 3 a 5, magia de nível baixo 3, habilidade de classe 1 a 2 por dia). Faça isso uma vez, sem comentar no texto. Itens permanentes como armas, armaduras, grimórios e ferramentas NÃO têm contador — ignore-os.\n\n" +
 "USOS LIMITADOS: itens consumíveis (poções, elixires, bombas, pergaminhos), magias por espaço e habilidades com número de vezes por dia têm CONTADOR. Ao conceder um item assim, declare o total em \"usosDefinidos\" (ex.: 3 doses). Sempre que o personagem usar um deles na cena, registre em \"usosConsumidos\" com a quantidade gasta — o aplicativo subtrai e mostra o restante na ficha. Um item consumível que chega a zero é REMOVIDO do inventário automaticamente; não o mencione mais como disponível. Magias e habilidades esgotadas ficam indisponíveis até um descanso longo.\n\n" +
 "DESCANSO LONGO: quando o grupo dormir ou descansar várias horas em segurança, marque \"descansoLongo\" com a lista de e-mails que descansaram (ou true para todos). O aplicativo restaura os pontos de vida ao máximo, recarrega magias e habilidades e remove a fadiga. Narre isso no texto. Itens consumíveis gastos NÃO voltam. Nunca deixe um descanso longo passar sem marcar este campo.\n\n" +
@@ -2208,11 +2227,11 @@ FICHA_START+"\n{ ...JSON... }\n"+FICHA_END+"\n\n" +
 ' "magiasPerdidas": [{"email": string, "magias": [string]}],\n'+
 ' "periciasTreinadas": [{"email": string, "pericias": [{"nome": string, "posto": "treinado"|"especialista"|"mestre"|"lendario"}]}],\n'+
 ' "eventos": [{"tipo": "COMBATE_FINALIZADO", "inimigosDerrotados": number}],\n'+
-' "estadoNarrativo": {"objetivo": string|null, "proximoPasso": string|null, "ganchosAtivos": [string], "misterios": [string], "missaoStatus": "ativa"|"concluida"|"falhou"|"abandonada", "npcs": [{"nome": string, "relacao": "aliada"|"neutra"|"hostil"|"desconhecida", "estado": "viva"|"morta"|"desaparecida"}], "locais": [{"nome": string, "situacao": "segura"|"sob-ameaca"|"desconhecida"}], "faccoes": [{"nome": string, "relacao": "aliada"|"neutra"|"hostil"|"desconhecida"}], "decisoesTomadas": [string]}\n'+
+' "estadoNarrativo": {"objetivo": string|null, "proximoPasso": string|null, "ganchosAtivos": [string], "misterios": [string], "missaoStatus": "ativa"|"concluida"|"falhou"|"abandonada", "npcs": [{"nome": string, "relacao": "aliada"|"neutra"|"hostil"|"desconhecida", "estado": "viva"|"morta"|"desaparecida"}], "locais": [{"nome": string, "situacao": "segura"|"sob-ameaca"|"desconhecida"}], "faccoes": [{"nome": string, "relacao": "aliada"|"neutra"|"hostil"|"desconhecida"}], "decisoesTomadas": [string], "reputacaoMudancas": [{"nome": string, "delta": number, "motivo": string}]}\n'+
 "}\n\n" +
 (isGroup
  ? "Regras críticas: 1) \"cenas\" deve sempre listar TODOS os jogadores confirmados da aventura, cada um em exatamente uma cena — nunca esqueça ninguém. 2) \"fichas\" deve sempre incluir a ficha atual de TODOS os membros da cena ativa (mesmo sem mudanças), com \"experiencia\" refletindo o total acumulado. "
- : "Regras críticas: 1) Não existem cenas nem outros jogadores nesta aventura. 2) \"fichas\" deve conter a ficha atual do jogador (mesmo sem mudanças), com \"experiencia\" refletindo o total acumulado. ") + "3) NUNCA altere a identidade de um personagem: nome, ancestralidade, linhagem, antecedente e classe são definidos pelo jogador na criação e devem ser repetidos exatamente como estão. Se você não souber o valor de um campo, repita o valor anterior em vez de inventar ou deixar em branco. Nunca reduza o nível nem a experiência de um personagem. 4) INVENTÁRIO, MAGIAS E PERÍCIAS: o aplicativo controla as listas \"equipamento\", \"magias\" e \"pericias\" — o que você escrever nesses arrays é IGNORADO. Os modificadores de perícia são calculados automaticamente pelo aplicativo (nível + proficiência + atributo); NUNCA calcule, informe ou corrija modificadores, e nunca repita a ficha no chat. Para treinar o personagem numa perícia nova ou elevar seu posto, use \"periciasTreinadas\". Para dar ou tirar um item, ou ensinar/remover uma magia, use exclusivamente \"itensGanhos\", \"itensPerdidos\", \"magiasAprendidas\" e \"magiasPerdidas\", listando apenas o que mudou NESTE turno (arrays vazios quando nada mudou). Nunca remova algo do inventário do jogador sem um motivo narrado explicitamente na cena. 5) \"xpConcedido\" lista apenas o XP ganho NESTE turno (array vazio quando não houve ganho). 6) \"eventos\": toda vez que um combate desta cena terminar NESTE turno (todos os inimigos derrotados, fugiram ou se renderam), inclua um item {\"tipo\":\"COMBATE_FINALIZADO\",\"inimigosDerrotados\":N} com a contagem exata de inimigos derrotados nesse combate (0 se ninguém morreu, ex.: fuga ou rendição). Não repita esse evento em turnos seguintes do mesmo combate, nem invente combates que não aconteceram. Nunca inclua eventos de outro tipo — críticos e falhas são controlados pelo próprio aplicativo, não pela narrativa. Array vazio quando não houve conclusão de combate neste turno. 7) \"estadoNarrativo\": mantenha sempre atualizado o objetivo atual da aventura (\"objetivo\", uma frase curta, ex.: \"Descobrir quem sabotou as caravanas\"), o próximo passo sugerido (\"proximoPasso\", ex.: \"Falar com o ferreiro sobre as marcas na ferradura\") e uma lista curta de ganchos de história ainda em aberto (\"ganchosAtivos\", no máximo 5 frases curtas). Repita os mesmos valores em turnos onde nada mudou; atualize \"objetivo\" só quando a missão principal genuinamente mudar, e \"proximoPasso\" a cada vez que a situação avançar. \"missaoStatus\" deve ser \"ativa\" na maior parte do jogo, e só virar \"concluida\", \"falhou\" ou \"abandonada\" quando isso genuinamente acontecer na narrativa (depois disso, se surgir um novo objetivo, volte a \"ativa\" com um novo \"objetivo\"). \"npcs\" é uma lista curta (no máximo 8) dos NPCs importantes já conhecidos pelo jogador nesta aventura, cada um com nome, relação com o jogador e se ainda está vivo — repita a lista inteira a cada turno, atualizando só quem de fato mudou. Isso é usado pelo aplicativo para lembrar o jogador onde parou, então nunca deixe em branco depois do primeiro turno da aventura. \"locais\" é uma lista curta (no máximo 8) dos lugares importantes já descobertos pelo jogador nesta aventura (cidades, ruínas, covis, o que fizer sentido na história), cada um com nome e situação atual (\"segura\", \"sob-ameaca\" ou \"desconhecida\" quando não houver informação clara) — repita a lista inteira a cada turno, adicionando um lugar novo só na primeira vez que o jogador genuinamente o descobrir ou chegar nele, e atualizando a situação de um lugar já conhecido quando ela mudar na narrativa. Nunca invente locais que o jogador ainda não visitou nem ouviu falar. \"misterios\" é uma lista curta (no máximo 5) de perguntas ainda sem resposta que a história já levantou mas não explicou (diferente de \"ganchosAtivos\", que são próximos passos de ação; um mistério é uma pergunta em aberto, ex.: \"quem realmente mandou a carta anônima?\") — repita a lista inteira a cada turno, e remova um mistério só quando a narrativa genuinamente o responder. \"faccoes\" é uma lista curta (no máximo 6) dos grupos, organizações ou facções importantes já conhecidos nesta aventura (uma guilda, uma ordem religiosa, um bando, uma casa nobre), cada uma com nome e a relação atual com o jogador (\"aliada\", \"neutra\", \"hostil\" ou \"desconhecida\") — repita a lista inteira a cada turno, igual aos NPCs. \"decisoesTomadas\" lista apenas as decisões importantes e irreversíveis que o jogador tomou NESTE turno (array vazio na maioria dos turnos) — frases curtas e objetivas, ex.: \"Poupou a vida do bandido capturado\" ou \"Aceitou a proposta do Barão Negro\"; use só para escolhas que realmente definem rumos da história, nunca para ações rotineiras de combate ou exploração. 8) O bloco deve conter apenas JSON válido, uma única vez, sempre ao final.";
+ : "Regras críticas: 1) Não existem cenas nem outros jogadores nesta aventura. 2) \"fichas\" deve conter a ficha atual do jogador (mesmo sem mudanças), com \"experiencia\" refletindo o total acumulado. ") + "3) NUNCA altere a identidade de um personagem: nome, ancestralidade, linhagem, antecedente e classe são definidos pelo jogador na criação e devem ser repetidos exatamente como estão. Se você não souber o valor de um campo, repita o valor anterior em vez de inventar ou deixar em branco. Nunca reduza o nível nem a experiência de um personagem. 4) INVENTÁRIO, MAGIAS E PERÍCIAS: o aplicativo controla as listas \"equipamento\", \"magias\" e \"pericias\" — o que você escrever nesses arrays é IGNORADO. Os modificadores de perícia são calculados automaticamente pelo aplicativo (nível + proficiência + atributo); NUNCA calcule, informe ou corrija modificadores, e nunca repita a ficha no chat. Para treinar o personagem numa perícia nova ou elevar seu posto, use \"periciasTreinadas\". Para dar ou tirar um item, ou ensinar/remover uma magia, use exclusivamente \"itensGanhos\", \"itensPerdidos\", \"magiasAprendidas\" e \"magiasPerdidas\", listando apenas o que mudou NESTE turno (arrays vazios quando nada mudou). Nunca remova algo do inventário do jogador sem um motivo narrado explicitamente na cena. 5) \"xpConcedido\" lista apenas o XP ganho NESTE turno (array vazio quando não houve ganho). 6) \"eventos\": toda vez que um combate desta cena terminar NESTE turno (todos os inimigos derrotados, fugiram ou se renderam), inclua um item {\"tipo\":\"COMBATE_FINALIZADO\",\"inimigosDerrotados\":N} com a contagem exata de inimigos derrotados nesse combate (0 se ninguém morreu, ex.: fuga ou rendição). Não repita esse evento em turnos seguintes do mesmo combate, nem invente combates que não aconteceram. Nunca inclua eventos de outro tipo — críticos e falhas são controlados pelo próprio aplicativo, não pela narrativa. Array vazio quando não houve conclusão de combate neste turno. 7) \"estadoNarrativo\": mantenha sempre atualizado o objetivo atual da aventura (\"objetivo\", uma frase curta, ex.: \"Descobrir quem sabotou as caravanas\"), o próximo passo sugerido (\"proximoPasso\", ex.: \"Falar com o ferreiro sobre as marcas na ferradura\") e uma lista curta de ganchos de história ainda em aberto (\"ganchosAtivos\", no máximo 5 frases curtas). Repita os mesmos valores em turnos onde nada mudou; atualize \"objetivo\" só quando a missão principal genuinamente mudar, e \"proximoPasso\" a cada vez que a situação avançar. \"missaoStatus\" deve ser \"ativa\" na maior parte do jogo, e só virar \"concluida\", \"falhou\" ou \"abandonada\" quando isso genuinamente acontecer na narrativa (depois disso, se surgir um novo objetivo, volte a \"ativa\" com um novo \"objetivo\"). \"npcs\" é uma lista curta (no máximo 8) dos NPCs importantes já conhecidos pelo jogador nesta aventura, cada um com nome, relação com o jogador e se ainda está vivo — repita a lista inteira a cada turno, atualizando só quem de fato mudou. Isso é usado pelo aplicativo para lembrar o jogador onde parou, então nunca deixe em branco depois do primeiro turno da aventura. \"locais\" é uma lista curta (no máximo 8) dos lugares importantes já descobertos pelo jogador nesta aventura (cidades, ruínas, covis, o que fizer sentido na história), cada um com nome e situação atual (\"segura\", \"sob-ameaca\" ou \"desconhecida\" quando não houver informação clara) — repita a lista inteira a cada turno, adicionando um lugar novo só na primeira vez que o jogador genuinamente o descobrir ou chegar nele, e atualizando a situação de um lugar já conhecido quando ela mudar na narrativa. Nunca invente locais que o jogador ainda não visitou nem ouviu falar. \"misterios\" é uma lista curta (no máximo 5) de perguntas ainda sem resposta que a história já levantou mas não explicou (diferente de \"ganchosAtivos\", que são próximos passos de ação; um mistério é uma pergunta em aberto, ex.: \"quem realmente mandou a carta anônima?\") — repita a lista inteira a cada turno, e remova um mistério só quando a narrativa genuinamente o responder. \"faccoes\" é uma lista curta (no máximo 6) dos grupos, organizações ou facções importantes já conhecidos nesta aventura (uma guilda, uma ordem religiosa, um bando, uma casa nobre), cada uma com nome e a relação atual com o jogador (\"aliada\", \"neutra\", \"hostil\" ou \"desconhecida\") — repita a lista inteira a cada turno, igual aos NPCs. \"decisoesTomadas\" lista apenas as decisões importantes e irreversíveis que o jogador tomou NESTE turno (array vazio na maioria dos turnos) — frases curtas e objetivas, ex.: \"Poupou a vida do bandido capturado\" ou \"Aceitou a proposta do Barão Negro\"; use só para escolhas que realmente definem rumos da história, nunca para ações rotineiras de combate ou exploração. \"reputacaoMudancas\" lista apenas mudanças de reputação com uma facção que aconteceram NESTE turno (array vazio na maioria dos turnos) — cada item com o nome exato de uma facção já listada em \"faccoes\", um \"delta\" pequeno (entre -20 e 20; negativo quando o jogador prejudicou essa facção, positivo quando ajudou) e um \"motivo\" curto explicando por quê. Use com moderação, só para ações que realmente afetam como aquele grupo vê o jogador — nunca para cada rolagem ou combate comum. 8) O bloco deve conter apenas JSON válido, uma única vez, sempre ao final.";
 }
 
 function buildCreationSystemPrompt(){
@@ -3559,6 +3578,13 @@ function contarInimigosDerrotadosRegex(msgs){
  turno, nunca reescreve ou apaga o histórico) e o app trunca/sanitiza o
  texto antes de gravar, a mesma tolerância a risco já aceita para
  ITEM_GANHO e MAGIA_APRENDIDA.
+ P5 (nova auditoria, seção 29 — "Metagame: reputação"): REPUTACAO_MUDOU
+ segue o mesmo padrão de delta aditivo do DECISAO_REGISTRADA — a IA
+ declara só a variação deste turno (nunca o valor final), com um limite
+ pequeno por item (-20 a +20), e o app é quem soma, limita ao intervalo
+ -100..100 e persiste o total. A IA nunca escreve o número final
+ diretamente, só a variação — o motor continua sendo a única fonte de
+ verdade do valor acumulado, mesma regra de sempre.
  ========================================================= */
 var EVENT_LOG_MAX = 300;
 var TIPOS_EVENTO_VALIDOS = {
@@ -3576,14 +3602,15 @@ var TIPOS_EVENTO_VALIDOS = {
   "NPC_INTRODUZIDO": true,
   "LOCAL_DESCOBERTO": true,
   "FACCAO_INTRODUZIDA": true,
-  "DECISAO_REGISTRADA": true
+  "DECISAO_REGISTRADA": true,
+  "REPUTACAO_MUDOU": true
 };
 function eventLogVazio(){
   return {
     inimigosDerrotados:0, combatesFinalizados:0, criticos:0, falhasCriticas:0,
     xpTotal:0, itensGanhos:0, itensPerdidos:0, magiasAprendidas:0,
     descansos:0, niveisAlcancados:0, locaisDescobertos:0,
-    faccoesIntroduzidas:0, decisoesRegistradas:0,
+    faccoesIntroduzidas:0, decisoesRegistradas:0, reputacaoEventos:0,
     eventos:[], updatedAt:Date.now()
   };
 }
@@ -3680,6 +3707,10 @@ function aplicarEventosNoLog(log, validos, sceneId, origem){
     } else if(e.tipo==="DECISAO_REGISTRADA"){
       log.decisoesRegistradas += 1;
       entry.texto = String(e.texto||"").slice(0,200);
+    } else if(e.tipo==="REPUTACAO_MUDOU"){
+      log.reputacaoEventos += 1;
+      entry.nome = String(e.nome||"").slice(0,80);
+      entry.delta = (typeof e.delta==="number" && isFinite(e.delta)) ? e.delta : 0;
     }
     log.eventos.push(entry);
   });
@@ -3794,6 +3825,10 @@ function atualizarMissaoAtual(adv){
   var misterios = Array.isArray(en.misterios) ? en.misterios.filter(Boolean) : [];
   var faccoes = Array.isArray(en.faccoes) ? en.faccoes.filter(Boolean) : [];
   var decisoes = Array.isArray(en.decisoes) ? en.decisoes.filter(Boolean) : [];
+  // P5 (nova auditoria, seção 29 — "Metagame: reputação"): valor
+  // numérico acumulado por facção, indexado pelo mesmo nome normalizado
+  // usado para casar NPCs/locais/facções repetidos entre turnos.
+  var reputacoes = (en.reputacoes && typeof en.reputacoes==="object") ? en.reputacoes : {};
   var toggle = el("mission-toggle"), lista = el("mission-ganchos");
   if(ganchos.length || npcs.length || locais.length || misterios.length || faccoes.length || decisoes.length){
     toggle.classList.remove("hidden");
@@ -3818,7 +3853,9 @@ function atualizarMissaoAtual(adv){
     if(faccoes.length){
       html += faccoes.map(function(fc){
         var relLabel = LABEL_RELACAO_FACCAO[fc.relacao] || "desconhecida";
-        return '<li><span class="faccao-chip '+esc(fc.relacao||"desconhecida")+'">🛡️ '+esc(fc.nome)+"</span> — "+esc(relLabel)+"</li>";
+        var rep = reputacoes[normaliza(fc.nome)];
+        var repTxt = (rep && typeof rep.valor==="number") ? (" ("+(rep.valor>0?"+":"")+rep.valor+")") : "";
+        return '<li><span class="faccao-chip '+esc(fc.relacao||"desconhecida")+'">🛡️ '+esc(fc.nome)+"</span> — "+esc(relLabel)+esc(repTxt)+"</li>";
       }).join("");
     }
     if(decisoes.length){
@@ -4597,8 +4634,31 @@ async function runGmTurn(advId, sceneId){
      : [];
    decisoesNovas.forEach(function(d){ eventosMotor.push({tipo:"DECISAO_REGISTRADA", texto:d}); });
    var decisoes = decisoesNovas.length ? decisoesAnteriores.concat(decisoesNovas).slice(-DECISOES_MAX) : decisoesAnteriores;
-   if(objetivo || proximoPasso || ganchosAtivos.length || npcs.length || locais.length || misterios.length || faccoes.length || decisoes.length){
-     freshAdv.estadoNarrativo = { objetivo: objetivo, proximoPasso: proximoPasso, ganchosAtivos: ganchosAtivos, missaoStatus: missaoStatus, npcs: npcs, locais: locais, misterios: misterios, faccoes: faccoes, decisoes: decisoes, atualizadoEm: Date.now() };
+   // P5 (nova auditoria, seção 29 — "Metagame: reputação"): mesmo padrão
+   // de delta das decisões, mas numérico e acumulado por facção. A IA só
+   // declara a VARIAÇÃO deste turno (nunca o total); o app soma, prende
+   // cada item a um intervalo pequeno (-20..20, contra um valor absurdo
+   // vindo de um turno só) e o total acumulado a -100..100.
+   var REPUTACAO_DELTA_MAX = 20;
+   var REPUTACAO_TOTAL_MAX = 100;
+   var reputacoesAnteriores = (freshAdv.estadoNarrativo && freshAdv.estadoNarrativo.reputacoes && typeof freshAdv.estadoNarrativo.reputacoes==="object") ? freshAdv.estadoNarrativo.reputacoes : {};
+   var reputacoes = {};
+   Object.keys(reputacoesAnteriores).forEach(function(k){ reputacoes[k] = reputacoesAnteriores[k]; });
+   var mudancasReputacao = Array.isArray(en.reputacaoMudancas)
+     ? en.reputacaoMudancas.filter(function(r){ return r && typeof r.nome==="string" && r.nome.trim() && typeof r.delta==="number" && isFinite(r.delta); }).slice(0,5)
+     : [];
+   mudancasReputacao.forEach(function(r){
+     var nomeOk = r.nome.trim().slice(0,80);
+     var chave = normaliza(nomeOk);
+     var deltaOk = Math.max(-REPUTACAO_DELTA_MAX, Math.min(REPUTACAO_DELTA_MAX, Math.round(r.delta)));
+     if(!deltaOk) return;
+     var atual = (reputacoes[chave] && typeof reputacoes[chave].valor==="number") ? reputacoes[chave].valor : 0;
+     var novoValor = Math.max(-REPUTACAO_TOTAL_MAX, Math.min(REPUTACAO_TOTAL_MAX, atual+deltaOk));
+     reputacoes[chave] = { nome: nomeOk, valor: novoValor };
+     eventosMotor.push({tipo:"REPUTACAO_MUDOU", nome:nomeOk, delta:deltaOk});
+   });
+   if(objetivo || proximoPasso || ganchosAtivos.length || npcs.length || locais.length || misterios.length || faccoes.length || decisoes.length || Object.keys(reputacoes).length){
+     freshAdv.estadoNarrativo = { objetivo: objetivo, proximoPasso: proximoPasso, ganchosAtivos: ganchosAtivos, missaoStatus: missaoStatus, npcs: npcs, locais: locais, misterios: misterios, faccoes: faccoes, decisoes: decisoes, reputacoes: reputacoes, atualizadoEm: Date.now() };
      advChanged = true;
    }
  }
@@ -7201,6 +7261,22 @@ async function openAdmin(){
     html += statBox(totalMsgs, "Mensagens");
     html += '</div></div>';
 
+    /* ===== narrativa (Pedido do dono do app, ago/2026: ritmo repetitivo) =====
+       Controla a intensidade de reviravoltas/mudanças de ritmo que o
+       Mestre injeta — ver NARRATIVIDADE_NIVEIS e narratividadeInstrucao()
+       lá em cima, perto de advBody(). Vale para toda aventura NOVA
+       narração a partir de agora (não reescreve o que já foi narrado). */
+    html += '<div class="adm-section"><h4>Narrativa</h4>'+
+      '<p class="adm-note">Controla o quanto o Mestre busca reviravoltas e varia o ritmo da história em toda aventura ativa. Vale a partir da próxima resposta da IA — não é preciso reiniciar nenhuma aventura.</p>'+
+      '<div class="input-with-btn" style="margin-top:8px;">'+
+        '<select id="admin-narratividade" class="text-input">'+
+          '<option value="baixa">Baixa — ritmo estável, quase sem reviravoltas</option>'+
+          '<option value="media">Média (padrão) — reviravoltas ocasionais</option>'+
+          '<option value="alta">Alta — ritmo variado, reviravoltas frequentes</option>'+
+        '</select>'+
+        '<button type="button" class="ghost-btn" id="admin-narratividade-salvar">Salvar</button>'+
+      '</div><p class="hint" id="admin-narratividade-status"></p></div>';
+
     /* ===== funil ===== */
     var funilMax = users.length || 1;
     html += '<div class="adm-section"><h4>Funil de adoção</h4>';
@@ -7345,6 +7421,23 @@ async function openAdmin(){
     html += '<p class="adm-note" style="margin-top:16px;opacity:.75;">⚠️ Este painel mostra dados de todos os jogadores. Trate essas informações com cuidado.</p>';
 
     el("admin-body").innerHTML = html;
+    var narratSel = el("admin-narratividade");
+    if(narratSel) narratSel.value = (adminConfig && NARRATIVIDADE_NIVEIS[adminConfig.narratividade]) ? adminConfig.narratividade : "media";
+    var narratBtn = el("admin-narratividade-salvar");
+    if(narratBtn) narratBtn.addEventListener("click", async function(){
+      var novoNivel = narratSel.value;
+      narratBtn.disabled = true; narratBtn.textContent = "Salvando…";
+      try{
+        var freshCfg = await sGet("admin-config", true) || {};
+        adminConfig = Object.assign({}, freshCfg, {narratividade: novoNivel});
+        await sSet("admin-config", adminConfig, true);
+        el("admin-narratividade-status").textContent = "Salvo — vale a partir da próxima resposta do Mestre em qualquer aventura.";
+      }catch(err){
+        el("admin-narratividade-status").textContent = "Falha ao salvar: "+(err.message||err);
+      }finally{
+        narratBtn.disabled = false; narratBtn.textContent = "Salvar";
+      }
+    });
     el("admin-body").querySelectorAll("[data-editar-ficha]").forEach(function(b){
       b.addEventListener("click", function(){ abrirEditorFicha(b.getAttribute("data-editar-ficha")); });
     });
