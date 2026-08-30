@@ -5192,10 +5192,14 @@ var LIMITE_ARQUIVO_GRATUITO = 3;   // aventuras concluídas visíveis no plano g
    aventura de grupo nova e o código do modo síncrono não deve ser
    alterado por causa disso — ehGrupoSincrono() cobre também aventuras
    antigas, criadas antes deste campo existir (groupMode ausente).
-   O motor de ciclos diários (Fases 2 a 7 da especificação) ainda não
-   está implementado, por isso a opção assíncrona fica bloqueada na
-   interface até o motor de resolução existir de verdade — GRUPO_ASYNC_DISPONIVEL
-   é a chave única para religar a opção quando essas fases forem entregues. */
+   Fases 2-6 (ciclo diário, ordens, Mestre assíncrono, motor de
+   resolução e o scheduler server-side — este último num pacote
+   separado, ver functions/README.md) já estão implementadas e testadas
+   de forma isolada (sintaxe, referências de DOM, chaves sincronizadas).
+   O que falta antes de religar isto pra jogadores de verdade é testar
+   o fluxo ponta a ponta contra o Firestore/Gemini reais — ninguém
+   rodou um ciclo completo ainda. GRUPO_ASYNC_DISPONIVEL é a chave
+   única: mude para true quando esse teste for feito. */
 var GRUPO_ASYNC_DISPONIVEL = false;
 function ehGrupoSincrono(adv){ return !!adv && adv.mode==="grupo" && adv.groupMode!=="async"; }
 function ehGrupoAssincrono(adv){ return !!adv && adv.mode==="grupo" && adv.groupMode==="async"; }
