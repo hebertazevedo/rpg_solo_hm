@@ -588,6 +588,16 @@ a{color:var(--arcane-bright);}
 .async-order-actions{display:flex;gap:8px;margin-top:8px;}
 .async-order-actions button{font-size:11.5px;background:none;border:1px solid var(--line);border-radius:8px;padding:5px 10px;color:var(--text-lo);cursor:pointer;}
 .async-order-status-tag{font-size:11px;color:var(--text-lo);border:1px solid var(--line);border-radius:999px;padding:2px 8px;}
+.async-decision-card{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:#17181f;}
+.async-decision-card.respondida{opacity:.7;}
+.async-decision-top{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.async-decision-tag{font-size:11px;color:var(--text-lo);}
+.async-decision-title{font-size:13px;color:var(--text-hi);font-weight:600;margin:6px 0 2px;}
+.async-decision-desc{font-size:12.5px;color:var(--text-lo);margin:0 0 8px;}
+.async-decision-options{display:flex;flex-wrap:wrap;gap:8px;}
+.async-decision-options button{font-size:12px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:none;color:var(--text-hi);cursor:pointer;}
+.async-decision-options button.chosen{border-color:var(--arcane-bright);color:var(--arcane-bright);}
+.async-decision-auto{font-size:11.5px;color:#ffb86b;margin-top:6px;}
 .add-invite-btn:hover{border-color:var(--arcane);}
 .warn-line{font-size:11px;color:var(--brass-bright);margin-top:4px;}
 .mode-toggle{display:flex;gap:8px;margin-top:8px;}
@@ -982,7 +992,9 @@ a{color:var(--arcane-bright);}
   <div class="async-section">
    <div class="async-section-head">
     <h2>Decisões pendentes</h2>
+    <button type="button" class="add-invite-btn" id="async-ask-gm" style="width:auto;padding:8px 14px;">🔮 Consultar o Mestre</button>
    </div>
+   <p id="async-ask-gm-error" class="card-error hidden"></p>
    <div id="async-decisions-list" class="async-decisions-list">
     <p class="empty-hint">Nenhuma decisão pendente do Mestre por enquanto.</p>
    </div>
@@ -5292,6 +5304,23 @@ async function fecharCicloSeNecessario(advId, ciclo){
       var ord = await sGet(ordKey, true);
       if(ord && ord.status==="submitted"){ ord.status="locked"; ord.updatedAt=Date.now(); await sSet(ordKey, ord, true); }
     }
+    // Fase 4 — seções 14 (itens 5-6) e 15-18: decisões obrigatórias que
+    // ninguém respondeu ganham uma escolha automática agora, coerente
+    // com o personagem, para que o ciclo nunca fique travado esperando
+    // um jogador que não vai mais responder.
+    var pendentes = fresh.pendingDecisions || [];
+    var automaticas = fresh.automaticDecisions || [];
+    for(var j=0;j<pendentes.length;j++){
+      var p = pendentes[j];
+      if(p.obrigatorio && !p.respondida){
+        var personagemDoJogador = await sGet("character:"+p.playerEmail, true);
+        var decisao = await gerarDecisaoAutomatica(p, personagemDoJogador);
+        automaticas.push({player:p.playerEmail, pedidoId:p.id, action:decisao.action, reason:decisao.reason, source:decisao.source, decidedAt:Date.now()});
+        p.respondida = true; p.resposta = decisao.action; p.respondidaEm = Date.now(); p.autoDecidida = true;
+      }
+    }
+    fresh.pendingDecisions = pendentes;
+    fresh.automaticDecisions = automaticas;
     fresh.status = "closing";
     fresh.updatedAt = Date.now();
     await sSet(cycleKey(advId, ciclo.cycleId), fresh, true);
@@ -5383,6 +5412,170 @@ async function reordenarOrdens(advId, cycleId, orderedIds){
   }
 }
 
+async function todasOrdensDoCiclo(advId, cycleId){
+  var idx = await sGet(ordersIndexKey(advId, cycleId), true) || [];
+  var ordens = await Promise.all(idx.map(function(it){ return sGet(orderKey(advId, cycleId, it.id), true); }));
+  return ordens.filter(function(o){ return o && o.status!=="cancelled"; });
+}
+
+/* =========================================================
+   MESTRE ASSÍNCRONO (Fase 4)
+   Gera pedidosDeAcao a partir das ordens já enviadas no ciclo (spec
+   seção 11) e, no fechamento, decide automaticamente as pendências
+   obrigatórias sem resposta (seções 15-18). O que este bloco NÃO faz,
+   de propósito, é resolver testes/dados/consequências mecânicas — isso
+   é do motor de regras (Fase 5) e continua fora do escopo da IA (RF-045:
+   a IA declara intenção e narrativa, o motor determinístico calcula os
+   números).
+   ========================================================= */
+
+/* Perfil de decisão do personagem (spec seção 17). O campo livre
+   character.personalidade (texto escrito na criação da ficha) já existe
+   no app e é a fonte mais rica de contexto — os "sliders" abaixo só
+   entram como um empurrão leve para a escolha automática por sorteio
+   ponderado (seção 18) quando não há IA disponível para decidir; nunca
+   como regra rígida, como a própria spec pede. */
+function perfilDecisaoPersonagem(character){
+  var base = {riskTolerance:0.5, aggression:0.5, curiosity:0.5, loyalty:0.5, pragmatism:0.5, moralProfile:"equilibrado", priorities:[]};
+  if(character && character.perfilDecisao && typeof character.perfilDecisao==="object"){
+    Object.assign(base, character.perfilDecisao);
+  }
+  return base;
+}
+
+function idDecisao(i){ return "dec_"+Date.now().toString(36)+"_"+i; }
+
+/* Monta o contexto enviado ao Mestre: só as ordens enviadas até agora
+   neste ciclo, uma por jogador que já participou hoje — jogadores sem
+   ordem nenhuma não geram pedidos (spec seção 11: pedidos nascem da
+   intenção que o jogador já registrou, nunca de um jogador em branco). */
+async function montarContextoOrdensParaMestre(adv, ciclo){
+  var todas = await todasOrdensDoCiclo(adv.id, ciclo.cycleId);
+  var porJogador = {};
+  todas.forEach(function(o){
+    if(!porJogador[o.playerEmail]) porJogador[o.playerEmail] = [];
+    porJogador[o.playerEmail].push(o);
+  });
+  var linhas = [];
+  Object.keys(porJogador).forEach(function(email){
+    var membro = (adv.members||[]).filter(function(m){ return m.email===email; })[0];
+    var nome = (membro && membro.name) || email;
+    var ordens = porJogador[email].sort(function(a,b){ return (a.sequence||0)-(b.sequence||0); });
+    var texto = ordens.map(function(o){
+      var extra = [];
+      if(o.conditions && o.conditions.length) extra.push("condição: "+o.conditions.join("; "));
+      if(o.fallback) extra.push("se der errado: "+o.fallback);
+      return (o.sequence||1)+". "+o.text+(extra.length?" ("+extra.join(" | ")+")":"");
+    }).join("\n");
+    linhas.push("Jogador "+nome+" ("+email+"):\n"+texto);
+  });
+  return linhas.join("\n\n");
+}
+
+var ASYNC_GM_SYSTEM = "Você é o Mestre de uma aventura de RPG de fantasia em GRUPO ASSÍNCRONO — os jogadores enviam ordens ao longo do dia sem saber o resultado, e tudo é resolvido de uma vez à meia-noite. Nunca trate uma ordem como uma ação já resolvida. Nunca revele resultados de testes, dados ou consequências mecânicas: isso é feito por um motor de regras separado, fora desta chamada — você não recebe e não deve inventar esse resultado aqui.\n\n"+
+  "Sua única tarefa agora: olhar as ordens que os jogadores já enviaram hoje e, SÓ quando a ordem de um jogador genuinamente deixar uma decisão em aberto (ex.: \"vou entrar na fortaleza\" sem dizer por onde, havendo mais de um caminho plausível), levantar um pedido de decisão para aquele jogador especificamente. Não invente decisões desnecessárias — a maioria das ordens claras não precisa de pedido nenhum. Não crie pedido para um jogador que não enviou ordem nenhuma hoje.\n\n"+
+  "Responda SOMENTE com um objeto JSON, sem nenhum texto antes ou depois, comentário ou markdown, no formato exato:\n"+
+  '{"pedidosDeAcao":[{"playerEmail":"email do jogador","tipo":"obrigatorio"|"opcional"|"condicional"|"informativo","titulo":"pergunta curta","descricao":"contexto em uma frase","obrigatorio":true|false,"opcoes":["opção 1","opção 2"]}]}\n\n'+
+  "\"opcoes\" é obrigatório para tipo \"obrigatorio\" ou \"opcional\" (2 a 4 alternativas curtas e narrativamente distintas) e pode ser omitido para \"informativo\". Se nenhuma decisão for necessária ainda, responda exatamente {\"pedidosDeAcao\":[]}.";
+
+async function consultarMestreAssincrono(adv, ciclo){
+  var contexto = await montarContextoOrdensParaMestre(adv, ciclo);
+  if(!contexto.trim()) throw new Error("Ainda não há nenhuma ordem enviada hoje para o Mestre analisar.");
+  var raw = await callGeminiRaw(ASYNC_GM_SYSTEM, [{role:"user", parts:[{text:"ORDENS DE HOJE:\n\n"+contexto}]}]);
+  var slice = sliceJsonObject(raw);
+  if(!slice) throw new Error("O Mestre respondeu em um formato inesperado. Tente de novo.");
+  var data = null;
+  try{ data = JSON.parse(slice.json); }catch(e){ throw new Error("Não consegui interpretar a resposta do Mestre."); }
+  var brutos = (data && Array.isArray(data.pedidosDeAcao)) ? data.pedidosDeAcao : [];
+  var validEmails = (adv.members||[]).filter(function(m){ return m.status==="confirmado"; }).map(function(m){ return m.email; });
+  var tiposValidos = ["obrigatorio","opcional","condicional","informativo"];
+  var novos = [];
+  brutos.forEach(function(p, i){
+    if(!p || !p.playerEmail || !p.titulo) return;
+    var email = normEmail(p.playerEmail);
+    if(validEmails.indexOf(email)===-1) return; // nunca aceita pedido pra quem não está na aventura
+    var tipo = tiposValidos.indexOf(p.tipo)!==-1 ? p.tipo : "informativo";
+    novos.push({
+      id: idDecisao(i), playerEmail: email, tipo: tipo,
+      titulo: String(p.titulo).slice(0,200), descricao: String(p.descricao||"").slice(0,500),
+      obrigatorio: !!p.obrigatorio,
+      opcoes: Array.isArray(p.opcoes) ? p.opcoes.slice(0,4).map(String) : [],
+      respondida: false, resposta: null, autoDecidida:false,
+      criadaEm: Date.now(), respondidaEm: null
+    });
+  });
+  var freshKey = cycleKey(adv.id, ciclo.cycleId);
+  var fresh = await sGet(freshKey, true) || ciclo;
+  fresh.pendingDecisions = (fresh.pendingDecisions||[]).concat(novos);
+  fresh.updatedAt = Date.now();
+  await sSet(freshKey, fresh, true);
+  return fresh;
+}
+
+/* Jogador responde uma decisão (marca a ordem como parcialmente definida
+   — a resolução de fato ainda depende da Fase 5). */
+async function responderDecisao(advId, cycleId, decisaoId, resposta){
+  var key = cycleKey(advId, cycleId);
+  var ciclo = await sGet(key, true);
+  if(!ciclo) return null;
+  var p = (ciclo.pendingDecisions||[]).filter(function(x){ return x.id===decisaoId; })[0];
+  if(!p || p.playerEmail!==session.email) return ciclo;
+  if(ciclo.status!=="collecting") throw new Error("O ciclo de hoje já fechou — essa decisão não pode mais ser respondida.");
+  p.respondida = true; p.resposta = resposta; p.respondidaEm = Date.now();
+  ciclo.updatedAt = Date.now();
+  await sSet(key, ciclo, true);
+  return ciclo;
+}
+
+/* Escolha automática por sorteio ponderado (spec seção 18) — usada como
+   rede de segurança quando não há chave Gemini configurada no cliente
+   que está fechando o ciclo, ou quando a chamada à IA falha. Nunca deixa
+   uma decisão obrigatória sem resposta, e nunca trava esperando rede. */
+function escolherAutomaticamente(pedido, perfil){
+  var opcoes = (pedido.opcoes||[]).length ? pedido.opcoes.slice() : ["Manter a posição e reavaliar a situação"];
+  var arriscadas = /avan[cç]ar|atacar|confrontar|invadir|arromb|for[cç]ar|correr/i;
+  var cautelosas = /observar|recuar|esperar|evitar|fugir|esconder|aguardar/i;
+  var pesos = opcoes.map(function(o){
+    var w = 10;
+    if(arriscadas.test(o)) w += Math.round((perfil.riskTolerance-0.5)*20 + (perfil.aggression-0.5)*10);
+    if(cautelosas.test(o)) w += Math.round((0.5-perfil.riskTolerance)*20);
+    return Math.max(1, w);
+  });
+  var total = pesos.reduce(function(a,b){ return a+b; }, 0);
+  var r = Math.random()*total;
+  for(var i=0;i<opcoes.length;i++){ r -= pesos[i]; if(r<=0) return opcoes[i]; }
+  return opcoes[opcoes.length-1];
+}
+
+/* Tenta a IA primeiro (mais coerente com a personagem — spec seção 16),
+   cai pro sorteio ponderado se não houver chave, a chamada falhar ou a
+   resposta vier fora do esperado. Nunca deixa o fechamento do ciclo
+   travado esperando a IA indefinidamente: um try/catch cobre tudo. */
+async function gerarDecisaoAutomatica(pedido, character){
+  var perfil = perfilDecisaoPersonagem(character);
+  if(session.apiKey && (pedido.opcoes||[]).length){
+    try{
+      var sys = "Você escolhe UMA entre as opções abaixo para uma decisão que um personagem de RPG precisa tomar, porque o jogador não respondeu a tempo antes do fechamento do ciclo diário. Escolha a opção mais coerente com a personalidade do personagem, evitando escolher sempre a alternativa mecanicamente mais vantajosa. Responda SOMENTE com JSON: {\"escolha\":\"texto exatamente igual a uma das opções\",\"motivo\":\"frase curta explicando por quê\"}.";
+      var contexto = "Personagem: "+((character&&character.nome)||"desconhecido")+
+        ". Personalidade descrita pelo jogador: "+((character&&character.personalidade)||"não informada")+".\n"+
+        "Decisão: "+pedido.titulo+" — "+pedido.descricao+"\nOpções: "+(pedido.opcoes||[]).join(" | ");
+      var raw = await callGeminiRaw(sys, [{role:"user", parts:[{text:contexto}]}]);
+      var slice = sliceJsonObject(raw);
+      if(slice){
+        var d = JSON.parse(slice.json);
+        if(d && d.escolha && pedido.opcoes.indexOf(d.escolha)!==-1){
+          return {action:d.escolha, reason:(d.motivo||"Decisão automática do Mestre."), source:"ai"};
+        }
+      }
+    }catch(e){ console.warn("Decisão automática via IA falhou, caindo para sorteio ponderado:", e.message); }
+  }
+  return {
+    action: escolherAutomaticamente(pedido, perfil),
+    reason: "Escolha automática por perfil do personagem (sem IA disponível no fechamento).",
+    source: "weighted-random"
+  };
+}
+
 /* ---- Tela do ciclo assíncrono (UI) ---------------------------------- */
 var asyncTickTimer = null;
 var asyncCurrentCycle = null;
@@ -5415,6 +5608,7 @@ async function refreshAsyncDesk(){
   renderAsyncCycleCard();
   asyncOrdersCache = await minhasOrdensNoCiclo(currentAdv.id, ciclo.cycleId);
   renderAsyncOrders();
+  renderAsyncDecisions();
 }
 
 function tickAsyncCycle(){
@@ -5512,6 +5706,54 @@ el("order-editor-save").addEventListener("click", async function(){
     await refreshAsyncDesk();
   }catch(err){ errBox.textContent = err.message; errBox.classList.remove("hidden"); }
   finally{ btn.disabled=false; btn.textContent="Salvar ordem"; }
+});
+
+/* ---- Painel de decisões pendentes (Fase 4, UI) ---------------------- */
+var TIPO_DECISAO_LABEL = {obrigatorio:"Obrigatória", opcional:"Opcional", condicional:"Condicional", informativo:"Informativo"};
+function renderAsyncDecisions(){
+  var box = el("async-decisions-list");
+  var ciclo = asyncCurrentCycle;
+  var minhas = ((ciclo && ciclo.pendingDecisions) || []).filter(function(p){ return p.playerEmail===session.email; });
+  if(!minhas.length){ box.innerHTML = '<p class="empty-hint">Nenhuma decisão pendente do Mestre por enquanto.</p>'; return; }
+  var podeResponder = ciclo.status==="collecting";
+  box.innerHTML = minhas.map(function(p){
+    var respondida = !!p.respondida;
+    return '<div class="async-decision-card'+(respondida?' respondida':'')+'" data-id="'+p.id+'">'+
+      '<div class="async-decision-top"><span class="async-decision-tag">'+(TIPO_DECISAO_LABEL[p.tipo]||p.tipo)+(p.obrigatorio?" · obrigatória":"")+'</span>'+
+      (respondida ? '<span class="async-order-status-tag">'+(p.autoDecidida?"decidida pelo Mestre":"respondida")+'</span>' : '')+
+      '</div>'+
+      '<p class="async-decision-title">'+esc(p.titulo)+'</p>'+
+      (p.descricao ? '<p class="async-decision-desc">'+esc(p.descricao)+'</p>' : '')+
+      (p.opcoes && p.opcoes.length ?
+        '<div class="async-decision-options">'+p.opcoes.map(function(o){
+          return '<button type="button" data-op="'+esc(o)+'" class="'+(p.resposta===o?"chosen":"")+'"'+((respondida&&!podeResponder)||(respondida&&p.autoDecidida)?" disabled":"")+'>'+esc(o)+'</button>';
+        }).join("")+'</div>' : '')+
+      (p.autoDecidida ? '<p class="async-decision-auto">⚠ Você não respondeu a tempo — o Mestre escolheu por você: "'+esc(p.resposta)+'". Motivo: '+esc((ciclo.automaticDecisions||[]).filter(function(a){return a.pedidoId===p.id;}).map(function(a){return a.reason;})[0]||"")+'</p>' : '')+
+      '</div>';
+  }).join("");
+  if(podeResponder){
+    Array.from(box.querySelectorAll(".async-decision-card")).forEach(function(card){
+      var id = card.getAttribute("data-id");
+      Array.from(card.querySelectorAll(".async-decision-options button")).forEach(function(btn){
+        btn.addEventListener("click", async function(){
+          try{
+            await responderDecisao(currentAdv.id, asyncCurrentCycle.cycleId, id, btn.getAttribute("data-op"));
+            await refreshAsyncDesk();
+          }catch(err){ alert(err.message); }
+        });
+      });
+    });
+  }
+}
+el("async-ask-gm").addEventListener("click", async function(){
+  var errBox = el("async-ask-gm-error"); errBox.classList.add("hidden");
+  if(!session.apiKey){ errBox.textContent="Configure sua chave do Gemini para consultar o Mestre."; errBox.classList.remove("hidden"); return; }
+  var btn = el("async-ask-gm"); btn.disabled = true; var textoOriginal = btn.textContent; btn.textContent = "Consultando…";
+  try{
+    await consultarMestreAssincrono(currentAdv, asyncCurrentCycle);
+    await refreshAsyncDesk();
+  }catch(err){ errBox.textContent = err.message; errBox.classList.remove("hidden"); }
+  finally{ btn.disabled=false; btn.textContent=textoOriginal; }
 });
 
 
