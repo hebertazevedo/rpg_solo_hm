@@ -5214,13 +5214,12 @@ var LIMITE_ARQUIVO_GRATUITO = 3;   // aventuras concluídas visíveis no plano g
    antigas, criadas antes deste campo existir (groupMode ausente).
    Fases 2-6 (ciclo diário, ordens, Mestre assíncrono, motor de
    resolução e o scheduler server-side — este último num pacote
-   separado, ver functions/README.md) já estão implementadas e testadas
-   de forma isolada (sintaxe, referências de DOM, chaves sincronizadas).
-   O que falta antes de religar isto pra jogadores de verdade é testar
-   o fluxo ponta a ponta contra o Firestore/Gemini reais — ninguém
-   rodou um ciclo completo ainda. GRUPO_ASYNC_DISPONIVEL é a chave
-   única: mude para true quando esse teste for feito. */
-var GRUPO_ASYNC_DISPONIVEL = false;
+   separado, ver functions/README.md) estão implementadas. Liberado
+   para jogadores em 30/08/2026, depois do Firestore configurado e
+   testado. GRUPO_ASYNC_DISPONIVEL é a chave única: volte para false
+   se aparecer algum problema sério e for preciso tirar a modalidade
+   de circulação rapidamente enquanto se investiga. */
+var GRUPO_ASYNC_DISPONIVEL = true;
 function ehGrupoSincrono(adv){ return !!adv && adv.mode==="grupo" && adv.groupMode!=="async"; }
 function ehGrupoAssincrono(adv){ return !!adv && adv.mode==="grupo" && adv.groupMode==="async"; }
 
