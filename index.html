@@ -598,6 +598,10 @@ a{color:var(--arcane-bright);}
 .async-decision-options button{font-size:12px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:none;color:var(--text-hi);cursor:pointer;}
 .async-decision-options button.chosen{border-color:var(--arcane-bright);color:var(--arcane-bright);}
 .async-decision-auto{font-size:11.5px;color:#ffb86b;margin-top:6px;}
+.async-result-narrative{font-size:13px;color:var(--text-hi);line-height:1.5;background:#17181f;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;}
+.async-result-card{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:#17181f;margin-bottom:10px;}
+.async-result-card h4{margin:0 0 6px;font-size:12.5px;color:var(--text-lo);}
+.async-result-test{font-family:var(--font-mono);font-size:12px;color:var(--brass-bright);margin:4px 0;}
 .add-invite-btn:hover{border-color:var(--arcane);}
 .warn-line{font-size:11px;color:var(--brass-bright);margin-top:4px;}
 .mode-toggle{display:flex;gap:8px;margin-top:8px;}
@@ -1007,6 +1011,12 @@ a{color:var(--arcane-bright);}
    <div id="async-orders-list" class="async-orders-list">
     <p class="empty-hint">Você ainda não enviou nenhuma ordem hoje.</p>
    </div>
+  </div>
+  <div class="async-section hidden" id="async-result-section">
+   <div class="async-section-head">
+    <h2>Resultado do dia</h2>
+   </div>
+   <div id="async-result-body"></div>
   </div>
  </main>
 </div>
@@ -1717,7 +1727,7 @@ function isSyncedKey(key){
  // P3 (nova auditoria, seção 19 — presença/"digitando"): presence: e
  // typing: também precisam sincronizar, senão cada jogador só vê a
  // própria presença/digitação, nunca a dos outros.
- return /^(pub:|character:|adv:|member-adv:|scene-msgs:|pending-action:|check:|admin-config|event:|events-index|event-log:|market:|market-index|market-treasury|crafted:|producao:|ledger:|forge-chat:|turno:|iteminfo:|producao:|subscription:|upgrade-request:|presence:|typing:|cycle:|cycle-lock:|order:|orders-index:)/.test(key);
+ return /^(pub:|character:|adv:|member-adv:|scene-msgs:|pending-action:|check:|admin-config|event:|events-index|event-log:|market:|market-index|market-treasury|crafted:|producao:|ledger:|forge-chat:|turno:|iteminfo:|producao:|subscription:|upgrade-request:|presence:|typing:|cycle:|cycle-lock:|cycle-result:|order:|orders-index:)/.test(key);
 }
 /* Values are stored wrapped as {__v:rev, __t:ts, d:data} so a stale or failed
  remote write can never overwrite newer local data on screen. */
@@ -5576,6 +5586,268 @@ async function gerarDecisaoAutomatica(pedido, character){
   };
 }
 
+/* =========================================================
+   MOTOR DE RESOLUÇÃO (Fase 5)
+   Transforma as ordens travadas de um ciclo fechado ("closing") em
+   resultado ("resolved"): pilha narrativa, testes automáticos,
+   consequências e diário do dia (spec seções 19-33). Sempre em DUAS
+   chamadas de IA por cena, nunca uma só — é isso que garante RF-045 na
+   prática: a primeira só DECLARA quais testes são necessários (perícia +
+   CD), sem ver nenhum resultado; o motor deste app rola o d20 de
+   verdade (rollOne(), a mesma função usada em todo o resto do jogo) e
+   calcula o grau de sucesso; só então a segunda chamada narra o
+   resultado e propõe consequências (fichas/XP/itens/eventos), já com os
+   números prontos — a IA nunca inventa nem corrige um resultado
+   mecânico.
+   Quem dispara isso hoje é o próprio cliente (tickAsyncCycle), na
+   ausência do scheduler real da Fase 6 — por isso todo o corpo roda
+   sob o mesmo cycle-lock usado no fechamento, e falha de forma segura
+   (status "error", ordens preservadas) em vez de deixar o ciclo pela
+   metade.
+   ========================================================= */
+
+/* 1d20 + modificador, 4 graus de sucesso (SISTEMA_REGRAS: crítico se
+   supera a CD em 10+, sucesso se supera, fracasso se abaixo, fracasso
+   crítico se 10+ abaixo; 20 natural sobe um grau, 1 natural desce um
+   grau) — a MESMA regra descrita para o resto do jogo, aplicada aqui
+   pelo motor, nunca pela IA. */
+function grauDeSucesso(dado, total, cd){
+  var grau;
+  if(total >= cd+10) grau = 3;
+  else if(total >= cd) grau = 2;
+  else if(total <= cd-10) grau = 0;
+  else grau = 1;
+  if(dado===20) grau = Math.min(3, grau+1);
+  if(dado===1) grau = Math.max(0, grau-1);
+  var labels = ["fracasso crítico","fracasso","sucesso","sucesso crítico"];
+  return {grau:grau, label:labels[grau], critico:(grau===3), falhaCritica:(grau===0)};
+}
+/* Modificador para uma perícia que o personagem pode nem ter treinada —
+   nesse caso vale só o atributo (destreinado), igual ao resto do
+   sistema; skillMod() já existe e cobre o caso treinado. */
+function modificadorParaTeste(character, skillName){
+  var direto = skillMod(character, skillName);
+  if(direto!==null) return direto;
+  var ab = abilityForSkill(skillName);
+  return (ab && character && character.atributos && typeof character.atributos[ab]==="number") ? character.atributos[ab] : 0;
+}
+
+var ASYNC_RESOLUTION_TESTS_SYSTEM = "Você é o Mestre de uma aventura de RPG assíncrona resolvendo o fechamento do dia para um grupo de jogadores. Você recebe as ordens finais (já travadas, algumas escolhidas automaticamente para quem não respondeu a tempo) de cada jogador nesta cena.\n\n"+
+  "Sua única tarefa agora: 1) decidir a sequência narrativa mais coerente para resolver essas ações, considerando dependências e causalidade — se a ordem de um jogador depende do resultado da ordem de outro (ex.: um abre uma porta, outro entra por ela), o primeiro vem antes; ações independentes podem ficar em qualquer ordem; e 2) para cada jogador, declarar SE a ação dele exige um teste de perícia e, se exigir, qual perícia e qual CD (Classe de Dificuldade, um número, geralmente entre 10 e 30). NUNCA calcule, invente ou sugira um resultado de dado, grau de sucesso ou consequência — isso é feito por um motor separado depois desta chamada, com base na sua declaração.\n\n"+
+  "Responda SOMENTE com JSON, sem texto antes ou depois, no formato exato:\n"+
+  '{"ordem":["email-do-jogador-1","email-do-jogador-2"],"testes":[{"playerEmail":"...","pericia":"nome da perícia","cd":15,"motivo":"frase curta"}]}\n\n'+
+  "Inclua em \"testes\" só quem realmente precisa de um teste para o que tentou fazer — ações claramente seguras ou automáticas (comprar algo, conversar sem risco, descansar) não precisam de teste nenhum.";
+
+var ASYNC_RESOLUTION_NARRATE_SYSTEM = "Você é o Mestre de uma aventura de RPG assíncrona narrando o resultado do fechamento do dia. Você já recebe os resultados MECÂNICOS prontos (rolagens, modificadores, grau de sucesso) — nunca os invente, corrija ou ignore; narre a partir deles.\n\n"+
+  "Responda SOMENTE com um objeto JSON, sem texto antes ou depois, no formato exato:\n"+
+  '{"narrativaColetiva":"o que o grupo como um todo percebeu do dia, em 1-2 parágrafos, sem revelar segredos privados de um jogador específico sem justificativa narrativa",'+
+  '"porJogador":{"email":{"execucao":"como a ordem dele foi de fato executada, em 1a linha","resumoIndividual":"o resultado do dia para ELE, incluindo o que só ele saberia (1 parágrafo curto)"}},'+
+  '"fichas":{"email":{}},'+
+  '"xpConcedido":[{"email":"...","quantidade":10,"motivo":"..."}],'+
+  '"itensGanhos":[{"email":"...","itens":["..."]}],"itensPerdidos":[{"email":"...","itens":["..."]}],'+
+  '"magiasAprendidas":[{"email":"...","magias":["..."]}],"magiasPerdidas":[{"email":"...","magias":["..."]}],'+
+  '"eventos":[{"tipo":"COMBATE_FINALIZADO","inimigosDerrotados":0,"email":"..."}],'+
+  '"estadoNarrativo":{"objetivo":null,"proximoPasso":null,"ganchosAtivos":null}}\n\n'+
+  "Regras: 1) \"fichas\" segue a mesma convenção do resto do app — inclua só os campos que mudaram, repita valores que não sabe em vez de inventar, nunca altere identidade (nome/ancestralidade/classe). 2) NUNCA calcule XP, dano ou resultado de teste sozinho — use exatamente os números fornecidos. 3) \"eventos\" só com os tipos padrão do app (ex.: COMBATE_FINALIZADO, XP_GANHO, ITEM_GANHO, NPC_INTRODUZIDO, LOCAL_DESCOBERTO) — tipos desconhecidos são ignorados pelo app, então não invente novos. 4) informação que só um personagem descobriu (segredo, pista privada) vai em \"resumoIndividual\" dele, não em \"narrativaColetiva\" — a menos que haja um motivo narrativo pra virar público. 5) omita ou deixe null qualquer campo de \"estadoNarrativo\" que não mudou.";
+
+/* Monta o texto de contexto (ordens + decisões automáticas + testes já
+   resolvidos) enviado às duas chamadas acima. */
+function montarOrdensParaResolucao(ordens, adv){
+  return ordens.map(function(o){
+    var membro = (adv.members||[]).filter(function(m){ return m.email===o.playerEmail; })[0];
+    var nome = (membro && membro.name) || o.playerEmail;
+    var extra = [];
+    if(o.conditions && o.conditions.length) extra.push("condição: "+o.conditions.join("; "));
+    if(o.fallback) extra.push("se der errado: "+o.fallback);
+    if(o.autoDecidida) extra.push("[decisão automática, jogador não respondeu a tempo]");
+    return nome+" ("+o.playerEmail+"): "+o.text+(extra.length?" ("+extra.join(" | ")+")":"");
+  }).join("\n");
+}
+
+/* Resolve uma cena inteira: chamada 1 (declarar testes) → motor rola os
+   dados → chamada 2 (narrar + consequências) → aplica na ficha de cada
+   jogador (reaproveitando applyGmSheetUpdate/applyListDelta/
+   registrarEventos, os MESMOS usados no turno síncrono). Devolve os
+   outcomes por ordem, para o diário do ciclo (seção 33). */
+async function resolverCena(adv, ciclo, ordensDaCena, sceneId){
+  var emailsEnvolvidos = [];
+  ordensDaCena.forEach(function(o){ if(emailsEnvolvidos.indexOf(o.playerEmail)===-1) emailsEnvolvidos.push(o.playerEmail); });
+  var fichas = {};
+  await Promise.all(emailsEnvolvidos.map(function(em){
+    return sGet("character:"+em, true).then(function(c){ fichas[em] = c; });
+  }));
+
+  var contexto = montarOrdensParaResolucao(ordensDaCena, adv);
+  var raw1 = await callGeminiRaw(ASYNC_RESOLUTION_TESTS_SYSTEM, [{role:"user", parts:[{text:"ORDENS DA CENA (já travadas):\n\n"+contexto}]}]);
+  var slice1 = sliceJsonObject(raw1);
+  var decl = slice1 ? (JSON.parse(slice1.json)) : {ordem:[], testes:[]};
+
+  var testesResolvidos = {}; // playerEmail -> resultado mecânico
+  (decl.testes||[]).forEach(function(t){
+    if(!t || !t.playerEmail || emailsEnvolvidos.indexOf(t.playerEmail)===-1) return;
+    var personagem = fichas[t.playerEmail];
+    var mod = modificadorParaTeste(personagem, t.pericia);
+    var dado = rollOne(20);
+    var total = dado + mod;
+    var cd = (typeof t.cd==="number" && isFinite(t.cd)) ? t.cd : 15;
+    var g = grauDeSucesso(dado, total, cd);
+    testesResolvidos[t.playerEmail] = {
+      pericia: t.pericia||"", dado:dado, modificador:mod, total:total, cd:cd,
+      grau:g.grau, label:g.label, critico:g.critico, falhaCritica:g.falhaCritica, motivo:t.motivo||""
+    };
+  });
+
+  var resumoTestes = Object.keys(testesResolvidos).length ?
+    Object.keys(testesResolvidos).map(function(em){
+      var r = testesResolvidos[em];
+      return em+": "+r.pericia+" 1d20("+r.dado+")+"+r.modificador+" = "+r.total+" contra CD "+r.cd+" — "+r.label;
+    }).join("\n") : "(nenhum teste necessário nesta cena)";
+
+  var contexto2 = "ORDENS:\n"+contexto+"\n\nSEQUÊNCIA NARRATIVA DECIDIDA:\n"+((decl.ordem||[]).join(" → ")||"(livre)")+
+    "\n\nRESULTADOS MECÂNICOS JÁ CALCULADOS (use exatamente estes números):\n"+resumoTestes;
+  var raw2 = await callGeminiRaw(ASYNC_RESOLUTION_NARRATE_SYSTEM, [{role:"user", parts:[{text:contexto2}]}]);
+  var slice2 = sliceJsonObject(raw2);
+  var data = slice2 ? JSON.parse(slice2.json) : {};
+
+  // ---- aplica consequências, reaproveitando o mesmo caminho do turno síncrono ----
+  var eventosMotor = [];
+  Object.keys(testesResolvidos).forEach(function(em){
+    var r = testesResolvidos[em];
+    if(r.critico) eventosMotor.push({tipo:"TESTE_CRITICO", email:em});
+    if(r.falhaCritica) eventosMotor.push({tipo:"TESTE_FALHA_CRITICA", email:em});
+  });
+  if(data.eventos && Array.isArray(data.eventos)) eventosMotor = eventosMotor.concat(data.eventos);
+  if(eventosMotor.length){
+    try{ var logAtualizado = await registrarEventos(adv.id, sceneId, eventosMotor, "ia-async"); if(logAtualizado) eventLogAtual = logAtualizado; }
+    catch(e){ console.warn("Falha ao registrar eventos do ciclo assíncrono:", e); }
+  }
+
+  if(data.fichas && typeof data.fichas==="object"){
+    for(var em2 in data.fichas){
+      if(!Object.prototype.hasOwnProperty.call(data.fichas, em2)) continue;
+      var target = normEmail(em2);
+      if(emailsEnvolvidos.indexOf(target)===-1) continue; // só quem de fato está nesta cena
+      var existingSheet = await sGet("character:"+target, true);
+      var updatedSheet = applyGmSheetUpdate(existingSheet, data.fichas[em2]);
+      function deltaFor(arr, key, field){
+        var entry = (arr||[]).filter(function(x){ return normEmail(x.email)===target; })[0];
+        return entry ? (entry[field]||[]) : [];
+      }
+      updatedSheet.equipamento = applyListDelta(updatedSheet.equipamento,
+        deltaFor(data.itensGanhos, "itensGanhos","itens"), deltaFor(data.itensPerdidos, "itensPerdidos","itens"));
+      updatedSheet.magias = applyListDelta(updatedSheet.magias,
+        deltaFor(data.magiasAprendidas, "magiasAprendidas","magias"), deltaFor(data.magiasPerdidas, "magiasPerdidas","magias"));
+      var xpEntry = (data.xpConcedido||[]).filter(function(x){ return normEmail(x.email)===target; })[0];
+      if(xpEntry && xpEntry.quantidade){
+        updatedSheet.experiencia = Math.max(0, (updatedSheet.experiencia||0) + Math.max(0, Math.min(500, parseInt(xpEntry.quantidade,10)||0)));
+      }
+      await sSet("character:"+target, updatedSheet, true);
+    }
+  }
+
+  // ---- outcomes por ordem, para o diário (seção 27 e 33) ----
+  var outcomes = ordensDaCena.map(function(o){
+    var pj = (data.porJogador && data.porJogador[o.playerEmail]) || {};
+    return {
+      orderId:o.id, playerEmail:o.playerEmail, sceneId:sceneId,
+      intention:o.text, execution: pj.execucao || null,
+      test: testesResolvidos[o.playerEmail] || null,
+      resumoIndividual: pj.resumoIndividual || null
+    };
+  });
+  return {
+    outcomes: outcomes,
+    narrativaColetiva: data.narrativaColetiva || "",
+    estadoNarrativoParcial: (data.estadoNarrativo && typeof data.estadoNarrativo==="object") ? data.estadoNarrativo : null
+  };
+}
+
+/* Ponto de entrada: resolve TODOS os pedidos obrigatórios pendentes já
+   foram decididos na Fase 4 (fecharCicloSeNecessario); aqui só falta
+   resolver as ordens em si. Idempotente: só age sobre um ciclo em
+   "closing", e marca "resolving" antes de começar para que uma segunda
+   tentativa concorrente veja o estado mudado e desista cedo. */
+async function resolverCiclo(advId, cycleId){
+  var lockKey = "cycle-lock:"+advId+":"+cycleId;
+  var lock = await sGet(lockKey, true);
+  if(lock && (Date.now()-lock.at) < 120000) return null; // outro cliente já está resolvendo
+  await sSet(lockKey, {at:Date.now(), by:session.email, fase:"resolving"}, true);
+  var key = cycleKey(advId, cycleId);
+  try{
+    var ciclo = await sGet(key, true);
+    if(!ciclo || ciclo.status!=="closing") return ciclo;
+    ciclo.status = "resolving";
+    ciclo.resolutionStartedAt = Date.now();
+    await sSet(key, ciclo, true);
+
+    var adv = await sGet("adv:"+advId, true);
+    var ordens = (await todasOrdensDoCiclo(advId, cycleId)).filter(function(o){ return o.status==="locked"; });
+    var porCena = {};
+    ordens.forEach(function(o){ var sid = o.sceneId||"principal"; (porCena[sid]=porCena[sid]||[]).push(o); });
+
+    var outcomesTotais = [];
+    var narrativas = [];
+    var estadoAcumulado = {};
+    for(var sceneId in porCena){
+      if(!Object.prototype.hasOwnProperty.call(porCena, sceneId)) continue;
+      var res = await resolverCena(adv, ciclo, porCena[sceneId], sceneId);
+      outcomesTotais = outcomesTotais.concat(res.outcomes);
+      if(res.narrativaColetiva) narrativas.push(res.narrativaColetiva);
+      if(res.estadoNarrativoParcial) Object.assign(estadoAcumulado, res.estadoNarrativoParcial);
+    }
+
+    // grava execution/test/resumoIndividual em cada ordem (seção 27 —
+    // auditoria: intention/execution/test/consequences separados)
+    await Promise.all(outcomesTotais.map(function(oc){
+      var ordKey = orderKey(advId, cycleId, oc.orderId);
+      return sGet(ordKey, true).then(function(ord){
+        if(!ord) return;
+        ord.status = "resolved";
+        ord.execution = oc.execution; ord.test = oc.test; ord.resumoIndividual = oc.resumoIndividual;
+        return sSet(ordKey, ord, true);
+      });
+    }));
+
+    // estadoNarrativo consolidado, na mesma convenção usada pelo turno síncrono
+    var advFresh = await sGet("adv:"+advId, true) || adv;
+    var enAnterior = advFresh.estadoNarrativo || {};
+    var enNovo = Object.assign({}, enAnterior);
+    Object.keys(estadoAcumulado).forEach(function(k){
+      var v = estadoAcumulado[k];
+      if(v!==null && v!==undefined && !(Array.isArray(v)&&v.length===0)) enNovo[k] = v;
+    });
+    advFresh.estadoNarrativo = enNovo;
+    advFresh.lastResolvedCycleId = cycleId;
+    advFresh.updatedAt = Date.now();
+    await sSet("adv:"+advId, advFresh, true);
+
+    // diário do ciclo (spec seção 33) — imutável depois de "resolved"
+    var diario = {
+      cycleId: cycleId, advId: advId, cycleNumber: ciclo.cycleNumber,
+      openedAt: ciclo.openedAt, closedAt: ciclo.closesAt, resolvedAt: Date.now(),
+      submittedOrders: ordens.map(function(o){ return o.id; }),
+      automaticOrders: (ciclo.automaticDecisions||[]),
+      narrativeSummary: narrativas.join("\n\n"),
+      outcomes: outcomesTotais
+    };
+    await sSet("cycle-result:"+advId+":"+cycleId, diario, true);
+
+    ciclo = await sGet(key, true) || ciclo;
+    ciclo.status = "resolved";
+    ciclo.resolvedAt = Date.now();
+    ciclo.lastError = null;
+    await sSet(key, ciclo, true);
+    return ciclo;
+  }catch(err){
+    console.warn("Falha ao resolver ciclo assíncrono:", err);
+    var falhou = await sGet(key, true);
+    if(falhou){ falhou.status="error"; falhou.lastError = err.message||String(err); await sSet(key, falhou, true); }
+    return falhou;
+  } finally {
+    await sDel(lockKey, true);
+  }
+}
+
 /* ---- Tela do ciclo assíncrono (UI) ---------------------------------- */
 var asyncTickTimer = null;
 var asyncCurrentCycle = null;
@@ -5603,22 +5875,39 @@ async function refreshAsyncDesk(){
   if(!currentAdv) return;
   var ciclo = await getOrCreateCycle(currentAdv);
   ciclo = await fecharCicloSeNecessario(currentAdv.id, ciclo);
+  // Sem o scheduler real da Fase 6, é o próprio cliente que dispara a
+  // resolução quando percebe que já passou da hora — só quando há uma
+  // chave Gemini configurada aqui (a resolução precisa da IA). Se
+  // ninguém com chave configurada abrir o app, o ciclo fica em
+  // "closing" até alguém abrir — a limitação inerente de não ter um
+  // backend de verdade, documentada desde a Fase 2.
+  if(ciclo && ciclo.status==="closing" && agoraServidor()>=ciclo.resolvesAt && session.apiKey){
+    ciclo = await resolverCiclo(currentAdv.id, ciclo.cycleId) || ciclo;
+  }
   asyncCurrentCycle = ciclo;
   el("async-subtitle").textContent = "Dia "+ciclo.cycleNumber+" · "+ciclo.cycleId;
   renderAsyncCycleCard();
   asyncOrdersCache = await minhasOrdensNoCiclo(currentAdv.id, ciclo.cycleId);
   renderAsyncOrders();
   renderAsyncDecisions();
+  await renderAsyncResult();
 }
 
 function tickAsyncCycle(){
   if(view!=="async" || !asyncCurrentCycle) return;
   renderAsyncCycleCard();
-  if(asyncCurrentCycle.status==="collecting" && agoraServidor()>=asyncCurrentCycle.closesAt){
+  var c = asyncCurrentCycle;
+  if((c.status==="collecting" && agoraServidor()>=c.closesAt) ||
+     (c.status==="closing" && agoraServidor()>=c.resolvesAt && session.apiKey)){
     refreshAsyncDesk();
   }
 }
 
+var STATUS_CICLO_LABEL = {
+  collecting: "🟢 Ordens abertas", closing: "🔒 Ordens encerradas",
+  resolving: "⚙ O Mestre está resolvendo o dia…", resolved: "📖 Resultado do dia disponível",
+  error: "⚠ Algo falhou ao resolver o dia"
+};
 function renderAsyncCycleCard(){
   var ciclo = asyncCurrentCycle;
   if(!ciclo) return;
@@ -5626,11 +5915,27 @@ function renderAsyncCycleCard(){
   badge.textContent = "Dia "+ciclo.cycleNumber;
   if(ciclo.status==="collecting"){
     var restante = ciclo.closesAt - agoraServidor();
-    countdown.textContent = "Ordens abertas — fecham em "+fmtDuracaoLonga(restante);
+    countdown.textContent = STATUS_CICLO_LABEL.collecting+" — fecham em "+fmtDuracaoLonga(restante);
     hint.textContent = "Envie e edite suas ordens à vontade até o fechamento. Depois disso elas ficam travadas.";
-  } else {
-    countdown.textContent = "Ordens encerradas";
-    hint.textContent = "O ciclo de hoje já fechou e está aguardando o Mestre resolver as ordens — essa parte da aventura (motor de resolução automática) ainda está em construção.";
+  } else if(ciclo.status==="closing"){
+    countdown.textContent = STATUS_CICLO_LABEL.closing;
+    hint.textContent = session.apiKey ? "Resolvendo assim que possível…" : "Aguardando alguém com a chave do Gemini configurada abrir a aventura para o Mestre resolver o dia.";
+  } else if(ciclo.status==="resolving"){
+    countdown.textContent = STATUS_CICLO_LABEL.resolving;
+    hint.textContent = "O motor está rolando os testes e narrando o resultado de cada ordem. Isso leva alguns segundos.";
+  } else if(ciclo.status==="resolved"){
+    countdown.textContent = STATUS_CICLO_LABEL.resolved;
+    hint.textContent = "Veja o resultado do dia abaixo. Um novo ciclo abre à meia-noite.";
+  } else if(ciclo.status==="error"){
+    countdown.textContent = STATUS_CICLO_LABEL.error;
+    hint.innerHTML = esc(ciclo.lastError||"Erro desconhecido.")+' — <a href="#" id="async-retry-link">tentar de novo</a>';
+    var retry = el("async-retry-link");
+    if(retry) retry.addEventListener("click", async function(e){
+      e.preventDefault();
+      var fresh = await sGet(cycleKey(currentAdv.id, ciclo.cycleId), true);
+      if(fresh){ fresh.status="closing"; await sSet(cycleKey(currentAdv.id, ciclo.cycleId), fresh, true); }
+      await refreshAsyncDesk();
+    });
   }
   el("async-new-order").disabled = ciclo.status!=="collecting";
   el("async-new-order").style.opacity = ciclo.status!=="collecting" ? .5 : 1;
@@ -5745,6 +6050,37 @@ function renderAsyncDecisions(){
     });
   }
 }
+
+/* ---- Resultado do dia (Fase 5, UI) — seção 31 (resultado individual) */
+async function renderAsyncResult(){
+  var section = el("async-result-section"), body = el("async-result-body");
+  var ciclo = asyncCurrentCycle;
+  var idParaMostrar = null;
+  if(ciclo && ciclo.status==="resolved") idParaMostrar = ciclo.cycleId;
+  else if(currentAdv && currentAdv.lastResolvedCycleId && currentAdv.lastResolvedCycleId!==(ciclo&&ciclo.cycleId)) idParaMostrar = currentAdv.lastResolvedCycleId;
+  if(!idParaMostrar){ section.classList.add("hidden"); return; }
+  var diario = await sGet("cycle-result:"+currentAdv.id+":"+idParaMostrar, true);
+  if(!diario){ section.classList.add("hidden"); return; }
+  section.classList.remove("hidden");
+  var minhasOutcomes = (diario.outcomes||[]).filter(function(o){ return o.playerEmail===session.email; });
+  var html = "";
+  html += '<p class="async-cycle-hint" style="margin-bottom:8px;">Dia '+diario.cycleNumber+'</p>';
+  if(diario.narrativeSummary) html += '<div class="async-result-narrative">'+esc(diario.narrativeSummary).replace(/\n/g,"<br>")+'</div>';
+  if(!minhasOutcomes.length){
+    html += '<p class="empty-hint">Nenhuma ordem sua foi resolvida neste ciclo.</p>';
+  } else {
+    minhasOutcomes.forEach(function(o){
+      html += '<div class="async-result-card">'+
+        '<h4>Sua ordem</h4><p class="async-order-text">'+esc(o.intention)+'</p>'+
+        (o.execution ? '<p class="async-order-meta">'+esc(o.execution)+'</p>' : '')+
+        (o.test ? '<p class="async-result-test">🎲 '+esc(o.test.pericia)+' 1d20('+o.test.dado+')'+fmtMod(o.test.modificador)+' = '+o.test.total+' contra CD '+o.test.cd+' — '+esc(o.test.label)+'</p>' : '')+
+        (o.resumoIndividual ? '<p class="async-order-text">'+esc(o.resumoIndividual)+'</p>' : '')+
+        '</div>';
+    });
+  }
+  body.innerHTML = html;
+}
+
 el("async-ask-gm").addEventListener("click", async function(){
   var errBox = el("async-ask-gm-error"); errBox.classList.add("hidden");
   if(!session.apiKey){ errBox.textContent="Configure sua chave do Gemini para consultar o Mestre."; errBox.classList.remove("hidden"); return; }
