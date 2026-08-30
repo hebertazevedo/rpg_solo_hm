@@ -602,6 +602,12 @@ a{color:var(--arcane-bright);}
 .async-result-card{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:#17181f;margin-bottom:10px;}
 .async-result-card h4{margin:0 0 6px;font-size:12.5px;color:var(--text-lo);}
 .async-result-test{font-family:var(--font-mono);font-size:12px;color:var(--brass-bright);margin:4px 0;}
+.async-collective-list{margin:0;padding-left:18px;font-size:12.5px;color:var(--text-hi);line-height:1.6;}
+.async-collective-list li{margin-bottom:4px;}
+.async-history-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;cursor:pointer;margin-bottom:8px;}
+.async-history-row:hover{border-color:var(--arcane-bright);}
+.async-history-row .ahr-date{font-size:11px;color:var(--text-lo);}
+.async-history-back{font-size:12px;color:var(--arcane-bright);background:none;border:none;cursor:pointer;padding:0 0 10px;}
 .add-invite-btn:hover{border-color:var(--arcane);}
 .warn-line{font-size:11px;color:var(--brass-bright);margin-top:4px;}
 .mode-toggle{display:flex;gap:8px;margin-top:8px;}
@@ -984,6 +990,10 @@ a{color:var(--arcane-bright);}
  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
  </button>
  <div class="brand-text"><b id="async-title">Aventura assíncrona</b><span id="async-subtitle">Ciclo diário</span></div>
+ <div class="spacer" style="flex:1;"></div>
+ <button class="icon-btn" id="async-history-btn" title="Histórico da aventura" aria-label="Histórico da aventura">
+ <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
+ </button>
  </header>
  <main id="async-layout" class="async-layout">
   <div class="async-cycle-card" id="async-cycle-card">
@@ -1019,6 +1029,16 @@ a{color:var(--arcane-bright);}
    <div id="async-result-body"></div>
   </div>
  </main>
+</div>
+
+<!-- HISTÓRICO DA AVENTURA ASSÍNCRONA (Fase 7) -->
+<div class="modal-overlay hidden" id="async-history-overlay">
+ <div class="modal-box" style="max-width:520px;">
+ <div class="modal-head"><h3 id="async-history-title">Histórico da aventura</h3><button class="icon-btn" id="async-history-close" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button></div>
+ <div class="modal-body">
+  <div id="async-history-body"><p class="empty-hint">Carregando…</p></div>
+ </div>
+ </div>
 </div>
 
 <!-- ORDER EDITOR MODAL (grupo assíncrono) -->
@@ -1727,7 +1747,7 @@ function isSyncedKey(key){
  // P3 (nova auditoria, seção 19 — presença/"digitando"): presence: e
  // typing: também precisam sincronizar, senão cada jogador só vê a
  // própria presença/digitação, nunca a dos outros.
- return /^(pub:|character:|adv:|member-adv:|scene-msgs:|pending-action:|check:|admin-config|event:|events-index|event-log:|market:|market-index|market-treasury|crafted:|producao:|ledger:|forge-chat:|turno:|iteminfo:|producao:|subscription:|upgrade-request:|presence:|typing:|cycle:|cycle-lock:|cycle-result:|order:|orders-index:)/.test(key);
+ return /^(pub:|character:|adv:|member-adv:|scene-msgs:|pending-action:|check:|admin-config|event:|events-index|event-log:|market:|market-index|market-treasury|crafted:|producao:|ledger:|forge-chat:|turno:|iteminfo:|producao:|subscription:|upgrade-request:|presence:|typing:|cycle:|cycle-lock:|cycle-result:|cycle-result-index:|order:|orders-index:)/.test(key);
 }
 /* Values are stored wrapped as {__v:rev, __t:ts, d:data} so a stale or failed
  remote write can never overwrite newer local data on screen. */
@@ -5266,6 +5286,21 @@ function limitesDoCiclo(diaStr){
   };
 }
 function cycleKey(advId, diaStr){ return "cycle:"+advId+":"+diaStr; }
+/* Índice do diário (Fase 7 — "histórico", RF-015): a coleção "kv" não
+   permite listar por prefixo sem trazer tudo, então mantemos um índice
+   pequeno e explícito por aventura em vez de escanear a coleção
+   inteira toda vez que alguém quer ver o histórico. */
+function historicoIndexKey(advId){ return "cycle-result-index:"+advId; }
+async function registrarNoIndiceDeHistorico(advId, entrada){
+  var key = historicoIndexKey(advId);
+  var idx = await sGet(key, true) || [];
+  if(idx.some(function(e){ return e.cycleId===entrada.cycleId; })) return idx; // idempotente
+  idx.push(entrada);
+  idx.sort(function(a,b){ return b.cycleNumber-a.cycleNumber; });
+  if(idx.length>120) idx = idx.slice(0,120); // teto generoso — ~4 meses de jogo diário
+  await sSet(key, idx, true);
+  return idx;
+}
 
 /* Busca o ciclo do dia corrente (fuso do ciclo) para a aventura, criando
    um novo se ainda não existir. Duas abas abrindo o mesmo dia ao mesmo
@@ -5645,6 +5680,7 @@ var ASYNC_RESOLUTION_TESTS_SYSTEM = "Você é o Mestre de uma aventura de RPG as
 var ASYNC_RESOLUTION_NARRATE_SYSTEM = "Você é o Mestre de uma aventura de RPG assíncrona narrando o resultado do fechamento do dia. Você já recebe os resultados MECÂNICOS prontos (rolagens, modificadores, grau de sucesso) — nunca os invente, corrija ou ignore; narre a partir deles.\n\n"+
   "Responda SOMENTE com um objeto JSON, sem texto antes ou depois, no formato exato:\n"+
   '{"narrativaColetiva":"o que o grupo como um todo percebeu do dia, em 1-2 parágrafos, sem revelar segredos privados de um jogador específico sem justificativa narrativa",'+
+  '"resultadoColetivo":[{"playerEmail":"...","texto":"uma frase curta e pública sobre o que esse jogador fez, no estilo \'Ana descobriu uma passagem secreta\'"}],'+
   '"porJogador":{"email":{"execucao":"como a ordem dele foi de fato executada, em 1a linha","resumoIndividual":"o resultado do dia para ELE, incluindo o que só ele saberia (1 parágrafo curto)"}},'+
   '"fichas":{"email":{}},'+
   '"xpConcedido":[{"email":"...","quantidade":10,"motivo":"..."}],'+
@@ -5652,7 +5688,7 @@ var ASYNC_RESOLUTION_NARRATE_SYSTEM = "Você é o Mestre de uma aventura de RPG 
   '"magiasAprendidas":[{"email":"...","magias":["..."]}],"magiasPerdidas":[{"email":"...","magias":["..."]}],'+
   '"eventos":[{"tipo":"COMBATE_FINALIZADO","inimigosDerrotados":0,"email":"..."}],'+
   '"estadoNarrativo":{"objetivo":null,"proximoPasso":null,"ganchosAtivos":null}}\n\n'+
-  "Regras: 1) \"fichas\" segue a mesma convenção do resto do app — inclua só os campos que mudaram, repita valores que não sabe em vez de inventar, nunca altere identidade (nome/ancestralidade/classe). 2) NUNCA calcule XP, dano ou resultado de teste sozinho — use exatamente os números fornecidos. 3) \"eventos\" só com os tipos padrão do app (ex.: COMBATE_FINALIZADO, XP_GANHO, ITEM_GANHO, NPC_INTRODUZIDO, LOCAL_DESCOBERTO) — tipos desconhecidos são ignorados pelo app, então não invente novos. 4) informação que só um personagem descobriu (segredo, pista privada) vai em \"resumoIndividual\" dele, não em \"narrativaColetiva\" — a menos que haja um motivo narrativo pra virar público. 5) omita ou deixe null qualquer campo de \"estadoNarrativo\" que não mudou.";
+  "Regras: 1) \"fichas\" segue a mesma convenção do resto do app — inclua só os campos que mudaram, repita valores que não sabe em vez de inventar, nunca altere identidade (nome/ancestralidade/classe). 2) NUNCA calcule XP, dano ou resultado de teste sozinho — use exatamente os números fornecidos. 3) \"eventos\" só com os tipos padrão do app (ex.: COMBATE_FINALIZADO, XP_GANHO, ITEM_GANHO, NPC_INTRODUZIDO, LOCAL_DESCOBERTO) — tipos desconhecidos são ignorados pelo app, então não invente novos. 4) informação que só um personagem descobriu (segredo, pista privada) vai em \"resumoIndividual\" dele, NUNCA em \"narrativaColetiva\" nem em \"resultadoColetivo\", a menos que haja um motivo narrativo explícito pra virar público — \"resultadoColetivo\" é visível para TODOS os jogadores da aventura, então trate cada frase como algo que o grupo inteiro poderia saber. 5) omita ou deixe null qualquer campo de \"estadoNarrativo\" que não mudou. 6) \"resultadoColetivo\" deve ter no máximo uma frase por jogador envolvido nesta cena — pode ficar vazio se nada for digno de nota coletivamente.";
 
 /* Monta o texto de contexto (ordens + decisões automáticas + testes já
    resolvidos) enviado às duas chamadas acima. */
@@ -5759,9 +5795,16 @@ async function resolverCena(adv, ciclo, ordensDaCena, sceneId){
       resumoIndividual: pj.resumoIndividual || null
     };
   });
+  // resultado coletivo (seção 32): só frases já filtradas pelo Mestre como
+  // seguras pra todo o grupo ver — nunca o resumoIndividual (privado) de
+  // ninguém. Validamos playerEmail contra quem de fato agiu nesta cena.
+  var resultadoColetivo = (Array.isArray(data.resultadoColetivo) ? data.resultadoColetivo : [])
+    .filter(function(r){ return r && r.texto && emailsEnvolvidos.indexOf(normEmail(r.playerEmail))!==-1; })
+    .map(function(r){ return {playerEmail:normEmail(r.playerEmail), texto:String(r.texto).slice(0,240)}; });
   return {
     outcomes: outcomes,
     narrativaColetiva: data.narrativaColetiva || "",
+    resultadoColetivo: resultadoColetivo,
     estadoNarrativoParcial: (data.estadoNarrativo && typeof data.estadoNarrativo==="object") ? data.estadoNarrativo : null
   };
 }
@@ -5791,12 +5834,14 @@ async function resolverCiclo(advId, cycleId){
 
     var outcomesTotais = [];
     var narrativas = [];
+    var coletivoTotais = [];
     var estadoAcumulado = {};
     for(var sceneId in porCena){
       if(!Object.prototype.hasOwnProperty.call(porCena, sceneId)) continue;
       var res = await resolverCena(adv, ciclo, porCena[sceneId], sceneId);
       outcomesTotais = outcomesTotais.concat(res.outcomes);
       if(res.narrativaColetiva) narrativas.push(res.narrativaColetiva);
+      coletivoTotais = coletivoTotais.concat(res.resultadoColetivo||[]);
       if(res.estadoNarrativoParcial) Object.assign(estadoAcumulado, res.estadoNarrativoParcial);
     }
 
@@ -5832,9 +5877,11 @@ async function resolverCiclo(advId, cycleId){
       submittedOrders: ordens.map(function(o){ return o.id; }),
       automaticOrders: (ciclo.automaticDecisions||[]),
       narrativeSummary: narrativas.join("\n\n"),
+      collectiveHighlights: coletivoTotais,
       outcomes: outcomesTotais
     };
     await sSet("cycle-result:"+advId+":"+cycleId, diario, true);
+    await registrarNoIndiceDeHistorico(advId, {cycleId:cycleId, cycleNumber:ciclo.cycleNumber, resolvedAt:diario.resolvedAt});
 
     ciclo = await sGet(key, true) || ciclo;
     ciclo.status = "resolved";
@@ -6056,20 +6103,17 @@ function renderAsyncDecisions(){
 }
 
 /* ---- Resultado do dia (Fase 5, UI) — seção 31 (resultado individual) */
-async function renderAsyncResult(){
-  var section = el("async-result-section"), body = el("async-result-body");
-  var ciclo = asyncCurrentCycle;
-  var idParaMostrar = null;
-  if(ciclo && ciclo.status==="resolved") idParaMostrar = ciclo.cycleId;
-  else if(currentAdv && currentAdv.lastResolvedCycleId && currentAdv.lastResolvedCycleId!==(ciclo&&ciclo.cycleId)) idParaMostrar = currentAdv.lastResolvedCycleId;
-  if(!idParaMostrar){ section.classList.add("hidden"); return; }
-  var diario = await sGet("cycle-result:"+currentAdv.id+":"+idParaMostrar, true);
-  if(!diario){ section.classList.add("hidden"); return; }
-  section.classList.remove("hidden");
+/* Monta o HTML de um relatório de dia (individual seção 31 + coletivo
+   seção 32) — reaproveitado tanto pelo "resultado do dia" quanto pelo
+   histórico (Fase 7), pra nunca ter duas versões divergentes do mesmo
+   relatório. */
+function montarHtmlResultadoDia(diario){
   var minhasOutcomes = (diario.outcomes||[]).filter(function(o){ return o.playerEmail===session.email; });
+  var membrosPorEmail = {};
+  ((currentAdv&&currentAdv.members)||[]).forEach(function(m){ membrosPorEmail[m.email]=m; });
   var html = "";
   html += '<p class="async-cycle-hint" style="margin-bottom:8px;">Dia '+diario.cycleNumber+'</p>';
-  if(diario.narrativeSummary) html += '<div class="async-result-narrative">'+esc(diario.narrativeSummary).replace(/\n/g,"<br>")+'</div>';
+  html += '<h4 style="margin:0 0 6px;color:var(--text-hi);font-size:13px;">Seu resultado</h4>';
   if(!minhasOutcomes.length){
     html += '<p class="empty-hint">Nenhuma ordem sua foi resolvida neste ciclo.</p>';
   } else {
@@ -6082,8 +6126,67 @@ async function renderAsyncResult(){
         '</div>';
     });
   }
-  body.innerHTML = html;
+  // Resultado coletivo (seção 32) — só o que o Mestre já filtrou como
+  // seguro para o grupo inteiro ver, nunca o resumoIndividual de ninguém.
+  if((diario.collectiveHighlights||[]).length || diario.narrativeSummary){
+    html += '<h4 style="margin:16px 0 6px;color:var(--text-hi);font-size:13px;">O grupo, hoje</h4>';
+    if(diario.narrativeSummary) html += '<div class="async-result-narrative">'+esc(diario.narrativeSummary).replace(/\n/g,"<br>")+'</div>';
+    if((diario.collectiveHighlights||[]).length){
+      html += '<ul class="async-collective-list">'+diario.collectiveHighlights.map(function(h){
+        var nome = (membrosPorEmail[h.playerEmail]&&membrosPorEmail[h.playerEmail].name) || h.playerEmail;
+        return '<li><b>'+esc(nome)+':</b> '+esc(h.texto)+'</li>';
+      }).join("")+'</ul>';
+    }
+  }
+  return html;
 }
+
+async function renderAsyncResult(){
+  var section = el("async-result-section"), body = el("async-result-body");
+  var ciclo = asyncCurrentCycle;
+  var idParaMostrar = null;
+  if(ciclo && ciclo.status==="resolved") idParaMostrar = ciclo.cycleId;
+  else if(currentAdv && currentAdv.lastResolvedCycleId && currentAdv.lastResolvedCycleId!==(ciclo&&ciclo.cycleId)) idParaMostrar = currentAdv.lastResolvedCycleId;
+  if(!idParaMostrar){ section.classList.add("hidden"); return; }
+  var diario = await sGet("cycle-result:"+currentAdv.id+":"+idParaMostrar, true);
+  if(!diario){ section.classList.add("hidden"); return; }
+  section.classList.remove("hidden");
+  body.innerHTML = montarHtmlResultadoDia(diario);
+}
+
+/* ---- Histórico da aventura (Fase 7, RF-015 — "diário" persistente) --- */
+async function abrirHistoricoAsync(){
+  el("async-history-overlay").classList.remove("hidden");
+  await renderAsyncHistoricoLista();
+}
+async function renderAsyncHistoricoLista(){
+  var body = el("async-history-body");
+  body.innerHTML = '<p class="empty-hint">Carregando…</p>';
+  var idx = await sGet(historicoIndexKey(currentAdv.id), true) || [];
+  if(!idx.length){ body.innerHTML = '<p class="empty-hint">Nenhum ciclo resolvido ainda.</p>'; return; }
+  body.innerHTML = idx.map(function(e){
+    return '<div class="async-history-row" data-cycle-id="'+esc(e.cycleId)+'">'+
+      '<span>Dia '+e.cycleNumber+'</span>'+
+      '<span class="ahr-date">'+new Date(e.resolvedAt).toLocaleDateString("pt-BR")+'</span>'+
+      '</div>';
+  }).join("");
+  Array.from(body.querySelectorAll(".async-history-row")).forEach(function(row){
+    row.addEventListener("click", function(){ abrirDiarioHistorico(row.getAttribute("data-cycle-id")); });
+  });
+}
+async function abrirDiarioHistorico(cycleId){
+  var body = el("async-history-body");
+  body.innerHTML = '<p class="empty-hint">Carregando…</p>';
+  var diario = await sGet("cycle-result:"+currentAdv.id+":"+cycleId, true);
+  if(!diario){ body.innerHTML = '<p class="empty-hint">Não encontrei o relatório desse dia.</p>'; return; }
+  var html = '<button type="button" class="async-history-back" id="async-history-voltar">← voltar ao histórico</button>';
+  html += montarHtmlResultadoDia(diario);
+  body.innerHTML = html;
+  el("async-history-voltar").addEventListener("click", renderAsyncHistoricoLista);
+}
+el("async-history-btn").addEventListener("click", abrirHistoricoAsync);
+el("async-history-close").addEventListener("click", function(){ el("async-history-overlay").classList.add("hidden"); });
+el("async-history-overlay").addEventListener("click", function(e){ if(e.target===el("async-history-overlay")) el("async-history-overlay").classList.add("hidden"); });
 
 el("async-ask-gm").addEventListener("click", async function(){
   var errBox = el("async-ask-gm-error"); errBox.classList.add("hidden");
