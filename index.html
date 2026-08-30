@@ -42,7 +42,7 @@ if (window.__fbPending) {
       onAuthStateChanged: auth.onAuthStateChanged,
       doc: fs.doc, getDoc: fs.getDoc, setDoc: fs.setDoc, deleteDoc: fs.deleteDoc,
       collection: fs.collection, getDocs: fs.getDocs, query: fs.query, where: fs.where,
-      onSnapshot: fs.onSnapshot, runTransaction: fs.runTransaction
+      onSnapshot: fs.onSnapshot, runTransaction: fs.runTransaction, serverTimestamp: fs.serverTimestamp
     };
     window.__fbStage = "4-pronto";
     console.info("Firebase pronto:", window.FIREBASE_CONFIG.projectId);
@@ -558,6 +558,36 @@ a{color:var(--arcane-bright);}
 .invite-row .rm{background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:16px;}
 .invite-row .rm:hover{color:var(--ember-bright);}
 .add-invite-btn{margin-top:8px;font-size:12px;color:var(--arcane-bright);background:none;border:1px dashed var(--line);border-radius:8px;padding:8px;width:100%;cursor:pointer;}
+.groupmode-options{display:flex;flex-direction:column;gap:8px;}
+.groupmode-opt{display:flex;align-items:flex-start;gap:10px;padding:10px;border:1px solid var(--line);border-radius:10px;cursor:pointer;}
+.groupmode-opt input{margin-top:3px;}
+.groupmode-opt-body{display:flex;flex-direction:column;gap:2px;}
+.groupmode-opt-body b{font-size:13px;color:var(--text-hi);}
+.groupmode-opt-body span{font-size:12px;color:var(--text-lo);}
+.groupmode-opt.locked{opacity:.55;cursor:not-allowed;}
+.groupmode-opt.locked input{pointer-events:none;}
+.async-layout{max-width:640px;margin:0 auto;padding:16px 18px 40px;display:flex;flex-direction:column;gap:20px;overflow-y:auto;height:calc(100dvh - 56px);}
+.async-cycle-card{border:1px solid var(--line);border-radius:14px;padding:14px 16px;background:linear-gradient(180deg,#1b1c24,#16171d);}
+.async-cycle-row{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.async-cycle-badge{font-weight:700;color:var(--text-hi);font-size:14px;}
+.async-cycle-countdown{font-variant-numeric:tabular-nums;font-size:13px;color:var(--arcane-bright);}
+.async-cycle-hint{margin:8px 0 0;font-size:12px;color:var(--text-lo);}
+.async-section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;}
+.async-section-head h2{font-size:14px;margin:0;color:var(--text-hi);}
+.async-orders-list,.async-decisions-list{display:flex;flex-direction:column;gap:10px;}
+.async-order-card{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:#17181f;}
+.async-order-card.locked{opacity:.7;}
+.async-order-top{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.async-order-seq{font-size:11px;color:var(--text-lo);}
+.async-order-priority{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);}
+.async-order-priority.alta{color:#ff8a8a;border-color:#ff8a8a55;}
+.async-order-priority.normal{color:var(--text-lo);}
+.async-order-priority.baixa{color:#8ab4ff;border-color:#8ab4ff55;}
+.async-order-text{font-size:13px;color:var(--text-hi);margin:8px 0 4px;}
+.async-order-meta{font-size:11.5px;color:var(--text-lo);}
+.async-order-actions{display:flex;gap:8px;margin-top:8px;}
+.async-order-actions button{font-size:11.5px;background:none;border:1px solid var(--line);border-radius:8px;padding:5px 10px;color:var(--text-lo);cursor:pointer;}
+.async-order-status-tag{font-size:11px;color:var(--text-lo);border:1px solid var(--line);border-radius:999px;padding:2px 8px;}
 .add-invite-btn:hover{border-color:var(--arcane);}
 .warn-line{font-size:11px;color:var(--brass-bright);margin-top:4px;}
 .mode-toggle{display:flex;gap:8px;margin-top:8px;}
@@ -933,12 +963,75 @@ a{color:var(--arcane-bright);}
  </div>
 </div>
 
-<!-- NEW GROUP ADVENTURE MODAL -->
+<!-- ============ ASYNC GROUP VIEW (ciclos diários) ============ -->
+<div id="view-async" class="view">
+ <header id="top-bar-async" style="display:flex;align-items:center;gap:14px;padding:10px 18px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#181920,#141419);flex-shrink:0;z-index:20;">
+ <button class="icon-btn" id="async-back" title="Voltar ao início" aria-label="Voltar">
+ <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+ </button>
+ <div class="brand-text"><b id="async-title">Aventura assíncrona</b><span id="async-subtitle">Ciclo diário</span></div>
+ </header>
+ <main id="async-layout" class="async-layout">
+  <div class="async-cycle-card" id="async-cycle-card">
+   <div class="async-cycle-row">
+    <span class="async-cycle-badge" id="async-cycle-badge">Dia —</span>
+    <span class="async-cycle-countdown" id="async-cycle-countdown">—</span>
+   </div>
+   <p class="async-cycle-hint" id="async-cycle-hint"></p>
+  </div>
+  <div class="async-section">
+   <div class="async-section-head">
+    <h2>Decisões pendentes</h2>
+   </div>
+   <div id="async-decisions-list" class="async-decisions-list">
+    <p class="empty-hint">Nenhuma decisão pendente do Mestre por enquanto.</p>
+   </div>
+  </div>
+  <div class="async-section">
+   <div class="async-section-head">
+    <h2>Minhas ordens do dia</h2>
+    <button type="button" class="add-invite-btn" id="async-new-order" style="width:auto;padding:8px 14px;">+ nova ordem</button>
+   </div>
+   <div id="async-orders-list" class="async-orders-list">
+    <p class="empty-hint">Você ainda não enviou nenhuma ordem hoje.</p>
+   </div>
+  </div>
+ </main>
+</div>
+
+<!-- ORDER EDITOR MODAL (grupo assíncrono) -->
+<div class="modal-overlay hidden" id="order-editor-overlay">
+ <div class="modal-box">
+ <div class="modal-head"><h3 id="order-editor-title">Nova ordem</h3><button class="icon-btn" id="order-editor-close" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button></div>
+ <div class="modal-body">
+  <div class="field"><label for="order-text">O que você vai tentar fazer?</label><textarea id="order-text" class="text-input" rows="3" placeholder="Ex.: Vou investigar a torre abandonada, evitando ser visto."></textarea></div>
+  <div class="field"><label for="order-priority">Prioridade</label>
+   <select id="order-priority" class="text-input">
+    <option value="baixa">Baixa</option>
+    <option value="normal" selected>Normal</option>
+    <option value="alta">Alta</option>
+   </select>
+  </div>
+  <div class="field"><label for="order-condition">Condição (opcional)</label><input id="order-condition" class="text-input" placeholder="Ex.: Se encontrar inimigos"></div>
+  <div class="field"><label for="order-fallback">Se algo der errado, o que seu personagem faz? (opcional)</label><input id="order-fallback" class="text-input" placeholder="Ex.: Recuar e observar de longe"></div>
+  <p id="order-editor-error" class="card-error hidden"></p>
+ </div>
+ <div class="modal-actions"><button class="secondary-btn" id="order-editor-cancel">Cancelar</button><button class="primary-btn" id="order-editor-save">Salvar ordem</button></div>
+ </div>
+</div>
+
 <div class="modal-overlay hidden" id="newadv-overlay">
  <div class="modal-box">
  <div class="modal-head"><h3 id="newadv-title">Nova aventura</h3><button class="icon-btn" id="newadv-close" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button></div>
  <div class="modal-body">
  <div class="field"><label for="newadv-name">Nome da aventura</label><input id="newadv-name" class="text-input" placeholder="Ex: Os Ecos de Kaer Maga"></div>
+ <div class="field" id="newadv-groupmode-field">
+ <label>Modalidade</label>
+ <div class="groupmode-options" id="newadv-groupmode-options">
+ <label class="groupmode-opt"><input type="radio" name="newadv-groupmode" value="sync" checked><div class="groupmode-opt-body"><b>Grupo síncrono</b><span>Jogue em tempo real com os outros jogadores, com controle de vez.</span></div></label>
+ <label class="groupmode-opt" id="newadv-groupmode-async-opt"><input type="radio" name="newadv-groupmode" value="async"><div class="groupmode-opt-body"><b>Grupo assíncrono <span id="newadv-async-lock">🔒</span></b><span>Cada jogador envia suas ordens ao longo do dia; o Mestre resolve tudo automaticamente à meia-noite.</span></div></label>
+ </div>
+ </div>
  <div class="field" id="newadv-invite-field">
  <label>Convidar por e-mail (precisa já ter cadastro no app)</label>
  <div id="newadv-invites"></div>
@@ -1470,7 +1563,7 @@ var inflightReads = {}; // key -> Promise
 var READ_TTL_MS = 2500;
 var VOLATILE_TTL_MS = 1200; // scene messages / pending actions
 function ttlFor(key){
- if(/^scene-msgs:|^pending-action:|^gm-lock:/.test(key)) return VOLATILE_TTL_MS;
+ if(/^scene-msgs:|^pending-action:|^gm-lock:|^cycle:|^cycle-lock:|^order:|^orders-index:/.test(key)) return VOLATILE_TTL_MS;
  return READ_TTL_MS;
 }
 function clonar(v){
@@ -1612,7 +1705,7 @@ function isSyncedKey(key){
  // P3 (nova auditoria, seção 19 — presença/"digitando"): presence: e
  // typing: também precisam sincronizar, senão cada jogador só vê a
  // própria presença/digitação, nunca a dos outros.
- return /^(pub:|character:|adv:|member-adv:|scene-msgs:|pending-action:|check:|admin-config|event:|events-index|event-log:|market:|market-index|market-treasury|crafted:|producao:|ledger:|forge-chat:|turno:|iteminfo:|producao:|subscription:|upgrade-request:|presence:|typing:)/.test(key);
+ return /^(pub:|character:|adv:|member-adv:|scene-msgs:|pending-action:|check:|admin-config|event:|events-index|event-log:|market:|market-index|market-treasury|crafted:|producao:|ledger:|forge-chat:|turno:|iteminfo:|producao:|subscription:|upgrade-request:|presence:|typing:|cycle:|cycle-lock:|order:|orders-index:)/.test(key);
 }
 /* Values are stored wrapped as {__v:rev, __t:ts, d:data} so a stale or failed
  remote write can never overwrite newer local data on screen. */
@@ -1770,6 +1863,16 @@ function fmtClock(ms){
  var s = Math.ceil(ms/1000);
  var m = Math.floor(s/60); s = s%60;
  return m+":"+(s<10?"0":"")+s;
+}
+/* Contagem regressiva mais longa (até 24h), usada no ciclo diário do
+   grupo assíncrono — fmtClock() é só mm:ss e estoura visualmente. */
+function fmtDuracaoLonga(ms){
+ if(ms<0) ms=0;
+ var s = Math.floor(ms/1000);
+ var h = Math.floor(s/3600); s -= h*3600;
+ var m = Math.floor(s/60); s -= m*60;
+ if(h>0) return h+"h "+(m<10?"0":"")+m+"m";
+ return m+"m "+(s<10?"0":"")+s+"s";
 }
 function initialsOf(name){ return (name||"?").trim().charAt(0).toUpperCase(); }
 
@@ -2846,7 +2949,7 @@ async function refreshHubAdventures(){
  var badgeCls = isPendingInvite ? "convite" : adv.status;
  var badgeText = isPendingInvite ? "Convite" : (adv.status==="lobby"?"Aguardando":adv.status==="ativa"?"Em andamento":adv.status==="pausada"?"Pausada":"Concluída");
  var icon = adv.mode==="grupo" ? "👥" : "🗡️";
- var meta = (adv.mode==="grupo"?"Em grupo":"Solo"+(adv.companheirosAtivados?" · 🤝 com companheiros":""))+' · anfitrião: '+esc(adv.hostName||"");
+ var meta = (adv.mode==="grupo"?("Em grupo"+(ehGrupoAssincrono(adv)?" · assíncrono":"")):"Solo"+(adv.companheirosAtivados?" · 🤝 com companheiros":""))+' · anfitrião: '+esc(adv.hostName||"");
  // Fase 2: mostra o objetivo atual no card, quando já existe — ajuda o
  // jogador a lembrar "onde parei" antes mesmo de abrir a aventura.
  var objetivoLine = (adv.estadoNarrativo && adv.estadoNarrativo.objetivo)
@@ -2891,7 +2994,7 @@ function maybeActivateAdventure(adv){
  return adv;
 }
 
-async function createAdventure(mode, name, inviteEmails, companionOpts){
+async function createAdventure(mode, name, inviteEmails, companionOpts, groupMode){
  var id = "adv_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,8);
  var now = Date.now();
  var members = [{email:session.email, name:session.name, status:"confirmado", invitedAt:now, respondedAt:now}];
@@ -2901,6 +3004,10 @@ async function createAdventure(mode, name, inviteEmails, companionOpts){
  });
  var adv = {
  id:id, name:name||(mode==="grupo"?"Aventura em grupo":"Aventura solo"), mode:mode,
+ // groupMode distingue as duas máquinas de estado do modo grupo: "sync"
+ // (turno/vez, comportamento existente e preservado) e "async" (ciclos
+ // diários — ver especificação). Irrelevante e sempre null em modo solo.
+ groupMode: mode==="grupo" ? (groupMode==="async" ? "async" : "sync") : null,
  hostEmail:session.email, hostName:session.name, createdAt:now, updatedAt:now,
  status: mode==="solo" ? "ativa" : "lobby",
  joinDeadline: mode==="grupo" ? now+JOIN_WINDOW_MS : null,
@@ -2926,6 +3033,19 @@ async function createAdventure(mode, name, inviteEmails, companionOpts){
 function openNewAdvModal(){
  el("newadv-name").value=""; el("newadv-error").classList.add("hidden");
  el("newadv-invites").innerHTML=""; newAdvInviteCount=0; addInviteRow();
+ var radios = document.getElementsByName("newadv-groupmode");
+ for(var i=0;i<radios.length;i++) radios[i].checked = (radios[i].value==="sync");
+ var asyncOpt = el("newadv-groupmode-async-opt");
+ var asyncRadio = document.querySelector('input[name="newadv-groupmode"][value="async"]');
+ if(!GRUPO_ASYNC_DISPONIVEL){
+   asyncOpt.classList.add("locked");
+   asyncRadio.disabled = true;
+   asyncOpt.title = "Em breve — o motor de resolução assíncrona ainda está em desenvolvimento.";
+ } else {
+   asyncOpt.classList.remove("locked");
+   asyncRadio.disabled = false;
+   asyncOpt.title = "";
+ }
  el("newadv-overlay").classList.remove("hidden");
 }
 el("newadv-close").addEventListener("click", function(){ el("newadv-overlay").classList.add("hidden"); });
@@ -2945,12 +3065,19 @@ el("newadv-create").addEventListener("click", async function(){
  var errBox = el("newadv-error"); errBox.classList.add("hidden");
  if(!name){ errBox.textContent="Dê um nome para a aventura."; errBox.classList.remove("hidden"); return; }
  var emails = Array.from(el("newadv-invites").querySelectorAll("input")).map(function(i){ return normEmail(i.value); }).filter(Boolean);
+ var groupModeSel = document.querySelector('input[name="newadv-groupmode"]:checked');
+ var groupMode = groupModeSel ? groupModeSel.value : "sync";
+ if(groupMode==="async" && !GRUPO_ASYNC_DISPONIVEL){
+   errBox.textContent="O grupo assíncrono ainda está em desenvolvimento. Por enquanto, crie uma aventura em grupo síncrono.";
+   errBox.classList.remove("hidden");
+   return;
+ }
  var btn = el("newadv-create"); btn.disabled=true; btn.textContent="Criando…";
  try{
  var lim = await podeCriarAventura("grupo");
  if(!lim.ok){ errBox.innerHTML = esc(lim.motivo)+' <a href="#" id="newadv-upgrade-link">Ver planos</a>'; errBox.classList.remove("hidden"); btn.disabled=false; btn.textContent="Criar aventura"; var upL=el("newadv-upgrade-link"); if(upL) upL.addEventListener("click", function(e){ e.preventDefault(); abrirUpgrade("limite_aventuras"); }); return; }
- var adv = await createAdventure("grupo", name, emails);
- logAdminEvent("adventure_created", {id:adv.id, name:adv.name, mode:adv.mode, hostEmail:session.email});
+ var adv = await createAdventure("grupo", name, emails, null, groupMode);
+ logAdminEvent("adventure_created", {id:adv.id, name:adv.name, mode:adv.mode, groupMode:adv.groupMode, hostEmail:session.email});
  el("newadv-overlay").classList.add("hidden");
  await enterLobby(adv.id, adv);
  }catch(err){ errBox.textContent="Erro ao criar: "+err.message; errBox.classList.remove("hidden"); }
@@ -3021,15 +3148,20 @@ async function refreshLobby(preloaded){
 async function enterPlay(advId, preloaded, skipWelcomeToast){
  var bloq = await bloqueadoPorProducao();
  if(bloq){ alert(bloq); return; }
+ var advPeek = preloaded || await sGet("adv:"+advId, true);
+ if(!advPeek){ enterHub(); return; }
+ // Grupo assíncrono é uma máquina de estado totalmente diferente (ciclos
+ // diários, sem "vez"/chat imediato) — usa sua própria tela em vez do
+ // fluxo de jogo síncrono/solo abaixo. Ver enterAsyncDesk().
+ if(ehGrupoAssincrono(advPeek)){ await enterAsyncDesk(advId, advPeek); return; }
  currentAdvId = advId; gameMode="play";
  sessionStartTs = Date.now();
  await inicializarEventLogSessao(advId);
- var adv = preloaded || await sGet("adv:"+advId, true);
- if(!adv){ enterHub(); return; }
+ var adv = advPeek;
  currentAdv = adv;
  el("game-back").classList.remove("hidden");
  el("game-title").textContent = adv.name;
- el("game-subtitle").textContent = (adv.mode==="grupo" ? "Aventura em grupo" : "Aventura solo") + (adv.companheirosAtivados ? " · 🤝 com companheiros" : "") + (adv.status==="encerrada" ? " · concluída" : "");
+ el("game-subtitle").textContent = (adv.mode==="grupo" ? ("Aventura em grupo"+(ehGrupoAssincrono(adv)?" (assíncrono)":"")) : "Aventura solo") + (adv.companheirosAtivados ? " · 🤝 com companheiros" : "") + (adv.status==="encerrada" ? " · concluída" : "");
  character = await sGet("character:"+session.email, true) || character;
  await loadPartyCache();
  currentSceneId = mySceneId(adv);
@@ -5029,6 +5161,359 @@ async function premiarEvento(evId, opcoes){
 var LIMITE_AVENTURAS_ATIVAS = 2;   // simultâneas no plano gratuito (ativa ou pausada)
 var LIMITE_GRUPO_ATIVAS = 1;       // aventuras em grupo simultâneas (por ora, para todos)
 var LIMITE_ARQUIVO_GRATUITO = 3;   // aventuras concluídas visíveis no plano gratuito
+
+/* =========================================================
+   GRUPO SÍNCRONO x GRUPO ASSÍNCRONO
+   Duas máquinas de estado distintas dentro de mode==="grupo" (ver
+   especificação "Aventuras em Grupo Síncronas/Assíncronas"). Fase 1
+   (separação das modalidades): o campo adv.groupMode já existe em toda
+   aventura de grupo nova e o código do modo síncrono não deve ser
+   alterado por causa disso — ehGrupoSincrono() cobre também aventuras
+   antigas, criadas antes deste campo existir (groupMode ausente).
+   O motor de ciclos diários (Fases 2 a 7 da especificação) ainda não
+   está implementado, por isso a opção assíncrona fica bloqueada na
+   interface até o motor de resolução existir de verdade — GRUPO_ASYNC_DISPONIVEL
+   é a chave única para religar a opção quando essas fases forem entregues. */
+var GRUPO_ASYNC_DISPONIVEL = false;
+function ehGrupoSincrono(adv){ return !!adv && adv.mode==="grupo" && adv.groupMode!=="async"; }
+function ehGrupoAssincrono(adv){ return !!adv && adv.mode==="grupo" && adv.groupMode==="async"; }
+
+/* =========================================================
+   MOTOR DE CICLOS DIÁRIOS (Fase 2) + ORDENS (Fase 3)
+   Grupo assíncrono — ver especificação. Cada aventura assíncrona tem,
+   a cada dia, um único "ciclo" (kv: cycle:{advId}:{diaISO}) que recolhe
+   as ordens dos jogadores até o fechamento e, dali em diante, aguarda
+   as Fases 4-6 (Mestre assíncrono, motor de resolução, scheduler
+   server-side) para virar resultado. Essas fases NÃO estão
+   implementadas ainda: um ciclo fechado ("closing") fica parado até lá
+   de propósito, em vez de fingir uma resolução automática que este
+   arquivo sozinho não tem como fazer de verdade — resolver testes,
+   consequências e narrativa de forma confiável exige o motor de
+   regras (Fase 5) e um agendador de verdade rodando no servidor
+   (Fase 6), não um cliente que pode simplesmente fechar a aba.
+   ========================================================= */
+
+/* ---- Relógio do servidor -------------------------------------------
+   "A hora oficial deve ser determinada no backend/servidor" (spec,
+   seção 6.1). Este app não tem backend próprio, mas o Firestore tem:
+   gravamos um carimbo serverTimestamp() num doc e o lemos de volta
+   para estimar o desvio entre o relógio deste navegador e o do
+   servidor. É uma aproximação (não uma garantia criptográfica) — o
+   suficiente para abrir/fechar o ciclo na hora certa na UI, mas a
+   autoridade final sobre o fechamento, quando o scheduler real (Fase
+   6) existir, deve continuar sendo o backend, nunca o cliente. */
+var serverClockOffsetMs = 0;
+var serverClockSynced = false;
+async function sincronizarRelogioServidor(){
+  if(serverClockSynced) return;
+  if(!fbReady()){ serverClockSynced = true; return; }
+  try{
+    var fb = window.__fb;
+    var antes = Date.now();
+    var ref = fb.doc(fb.db, "kv", "__clock_sync__");
+    await fb.setDoc(ref, {t: fb.serverTimestamp()});
+    var snap = await fb.getDoc(ref);
+    var depois = Date.now();
+    var t = snap.exists() ? snap.data().t : null;
+    if(t && typeof t.toMillis==="function"){
+      serverClockOffsetMs = t.toMillis() - Math.round((antes+depois)/2);
+    }
+  }catch(e){ console.warn("Não foi possível sincronizar o relógio do servidor:", e.message); }
+  serverClockSynced = true;
+}
+function agoraServidor(){ return Date.now() + serverClockOffsetMs; }
+
+/* ---- Janela do ciclo (fuso fixo, independente do fuso de cada jogador) */
+var FUSO_CICLO_OFFSET_MS = -3*60*60*1000; // America/Sao_Paulo, sem horário de verão desde 2019
+function diaCicloBR(ms){
+  var d = new Date(ms + FUSO_CICLO_OFFSET_MS);
+  var y = d.getUTCFullYear(), m = d.getUTCMonth()+1, day = d.getUTCDate();
+  return y+"-"+(m<10?"0":"")+m+"-"+(day<10?"0":"")+day;
+}
+function limitesDoCiclo(diaStr){
+  var p = diaStr.split("-").map(Number);
+  var meiaNoiteUTC = Date.UTC(p[0], p[1]-1, p[2]) - FUSO_CICLO_OFFSET_MS;
+  return {
+    openedAt: meiaNoiteUTC + 60*1000,                    // 00:01:00
+    closesAt: meiaNoiteUTC + (23*3600+59*60+59)*1000,    // 23:59:59
+    resolvesAt: meiaNoiteUTC + 24*3600*1000 + 60*1000    // 00:01:00 do dia seguinte
+  };
+}
+function cycleKey(advId, diaStr){ return "cycle:"+advId+":"+diaStr; }
+
+/* Busca o ciclo do dia corrente (fuso do ciclo) para a aventura, criando
+   um novo se ainda não existir. Duas abas abrindo o mesmo dia ao mesmo
+   tempo podem, em tese, criar o doc "ao mesmo tempo" — sSet() já resolve
+   isso por revisão (__v), então o pior caso é uma leitura redundante,
+   nunca um ciclo corrompido. */
+async function getOrCreateCycle(adv){
+  await sincronizarRelogioServidor();
+  var advId = adv.id;
+  var diaStr = diaCicloBR(agoraServidor());
+  var key = cycleKey(advId, diaStr);
+  var ciclo = await sGet(key, true);
+  if(ciclo) return ciclo;
+  var janela = limitesDoCiclo(diaStr);
+  var participantes = (adv.members||[]).filter(function(m){ return m.status==="confirmado"; }).map(function(m){ return m.email; });
+  var numero = (adv.cycleCount||0) + 1;
+  ciclo = {
+    cycleId: diaStr, advId: advId, cycleNumber: numero, status:"collecting",
+    openedAt: janela.openedAt, closesAt: janela.closesAt, resolvesAt: janela.resolvesAt,
+    participantEmails: participantes,
+    submittedOrders: [], pendingDecisions: [], automaticDecisions: [],
+    resolutionStartedAt:null, resolvedAt:null, lastError:null, updatedAt: Date.now()
+  };
+  var ok = await sSet(key, ciclo, true);
+  if(ok){
+    var advFresh = await sGet("adv:"+advId, true) || adv;
+    advFresh.currentCycleId = diaStr; advFresh.cycleCount = numero; advFresh.updatedAt = Date.now();
+    await sSet("adv:"+advId, advFresh, true);
+  }
+  return ciclo;
+}
+
+/* Fechamento do ciclo (spec seção 14, itens 1-2 e 7): trava novas ordens
+   e edições, e congela as ordens enviadas. Os itens 5,6,8,9 (decisões
+   automáticas, fila de resolução, execução) pertencem às Fases 4-5 e
+   ficam para depois — daqui em diante o ciclo fica em "closing" até lá. */
+async function fecharCicloSeNecessario(advId, ciclo){
+  if(!ciclo || ciclo.status!=="collecting") return ciclo;
+  if(agoraServidor() < ciclo.closesAt) return ciclo;
+  var lockKey = "cycle-lock:"+advId+":"+ciclo.cycleId;
+  var lock = await sGet(lockKey, true);
+  if(lock && (Date.now()-lock.at) < 30000) return ciclo; // outro cliente já está fechando
+  await sSet(lockKey, {at:Date.now(), by:session.email}, true);
+  try{
+    var fresh = await sGet(cycleKey(advId, ciclo.cycleId), true);
+    if(!fresh || fresh.status!=="collecting") return fresh || ciclo;
+    var idx = await sGet(ordersIndexKey(advId, ciclo.cycleId), true) || [];
+    for(var i=0;i<idx.length;i++){
+      var ordKey = orderKey(advId, ciclo.cycleId, idx[i].id);
+      var ord = await sGet(ordKey, true);
+      if(ord && ord.status==="submitted"){ ord.status="locked"; ord.updatedAt=Date.now(); await sSet(ordKey, ord, true); }
+    }
+    fresh.status = "closing";
+    fresh.updatedAt = Date.now();
+    await sSet(cycleKey(advId, ciclo.cycleId), fresh, true);
+    return fresh;
+  } finally {
+    await sDel(lockKey, true);
+  }
+}
+
+/* ---- Ordens do jogador (spec seções 8-10) --------------------------- */
+function ordersIndexKey(advId, cycleId){ return "orders-index:"+advId+":"+cycleId; }
+function orderKey(advId, cycleId, orderId){ return "order:"+advId+":"+cycleId+":"+orderId; }
+
+async function minhasOrdensNoCiclo(advId, cycleId){
+  var idx = await sGet(ordersIndexKey(advId, cycleId), true) || [];
+  var minhas = idx.filter(function(it){ return it.playerEmail===session.email; });
+  var ordens = await Promise.all(minhas.map(function(it){ return sGet(orderKey(advId, cycleId, it.id), true); }));
+  return ordens.filter(function(o){ return o && o.status!=="cancelled"; })
+    .sort(function(a,b){ return (a.sequence||0)-(b.sequence||0); });
+}
+
+async function criarOrdem(advId, cycleId, sceneId, campos){
+  var idxKey = ordersIndexKey(advId, cycleId);
+  var idx = await sGet(idxKey, true) || [];
+  var minhasSeq = idx.filter(function(it){ return it.playerEmail===session.email; }).length;
+  var id = "ord_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,7);
+  var now = Date.now();
+  var ordem = {
+    id:id, cycleId:cycleId, adventureId:advId, sceneId:sceneId||null,
+    playerEmail:session.email, characterId:(character&&character.id)||null,
+    sequence: minhasSeq+1,
+    actionType: campos.actionType || "generico",
+    text: (campos.text||"").trim(),
+    target: campos.target || null,
+    priority: campos.priority || "normal",
+    conditions: campos.conditions || [],
+    fallback: (campos.fallback||"").trim() || null,
+    submittedAt: now, updatedAt: now, version: 1,
+    status: "submitted", source: "player", versions: []
+  };
+  await sSet(orderKey(advId, cycleId, id), ordem, true);
+  idx.push({id:id, playerEmail:session.email, sequence:ordem.sequence});
+  await sSet(idxKey, idx, true);
+  return ordem;
+}
+
+async function atualizarOrdem(advId, cycleId, orderId, campos){
+  var key = orderKey(advId, cycleId, orderId);
+  var ordem = await sGet(key, true);
+  if(!ordem || ordem.playerEmail!==session.email) throw new Error("Ordem não encontrada.");
+  if(ordem.status!=="submitted") throw new Error("Essa ordem já foi travada no fechamento do ciclo e não pode mais ser editada.");
+  var anterior = {
+    text:ordem.text, target:ordem.target, priority:ordem.priority,
+    conditions:ordem.conditions, fallback:ordem.fallback, actionType:ordem.actionType,
+    version:ordem.version, updatedAt:ordem.updatedAt
+  };
+  ordem.versions = ordem.versions || [];
+  ordem.versions.push(anterior);
+  if(ordem.versions.length>20) ordem.versions = ordem.versions.slice(-20);
+  if(campos.text!==undefined) ordem.text = (campos.text||"").trim();
+  if(campos.actionType!==undefined) ordem.actionType = campos.actionType;
+  if(campos.target!==undefined) ordem.target = campos.target;
+  if(campos.priority!==undefined) ordem.priority = campos.priority;
+  if(campos.conditions!==undefined) ordem.conditions = campos.conditions;
+  if(campos.fallback!==undefined) ordem.fallback = (campos.fallback||"").trim() || null;
+  ordem.version = (ordem.version||1)+1;
+  ordem.updatedAt = Date.now();
+  await sSet(key, ordem, true);
+  return ordem;
+}
+
+async function cancelarOrdem(advId, cycleId, orderId){
+  var key = orderKey(advId, cycleId, orderId);
+  var ordem = await sGet(key, true);
+  if(!ordem || ordem.playerEmail!==session.email) return;
+  if(ordem.status!=="submitted") throw new Error("Essa ordem já foi travada e não pode mais ser cancelada.");
+  ordem.status="cancelled"; ordem.updatedAt=Date.now();
+  await sSet(key, ordem, true);
+}
+
+async function reordenarOrdens(advId, cycleId, orderedIds){
+  for(var i=0;i<orderedIds.length;i++){
+    var key = orderKey(advId, cycleId, orderedIds[i]);
+    var ordem = await sGet(key, true);
+    if(ordem && ordem.playerEmail===session.email && ordem.status==="submitted"){
+      ordem.sequence = i+1; ordem.updatedAt = Date.now();
+      await sSet(key, ordem, true);
+    }
+  }
+}
+
+/* ---- Tela do ciclo assíncrono (UI) ---------------------------------- */
+var asyncTickTimer = null;
+var asyncCurrentCycle = null;
+var asyncOrdersCache = [];
+var asyncEditingOrderId = null;
+
+async function enterAsyncDesk(advId, preloaded){
+  currentAdvId = advId; gameMode = "async";
+  var adv = preloaded || await sGet("adv:"+advId, true);
+  if(!adv){ enterHub(); return; }
+  currentAdv = adv;
+  character = await sGet("character:"+session.email, true) || character;
+  el("async-title").textContent = adv.name;
+  showView("async");
+  await refreshAsyncDesk();
+  if(asyncTickTimer) clearInterval(asyncTickTimer);
+  asyncTickTimer = setInterval(tickAsyncCycle, 1000);
+}
+el("async-back").addEventListener("click", function(){
+  if(asyncTickTimer){ clearInterval(asyncTickTimer); asyncTickTimer=null; }
+  currentAdv = null; enterHub();
+});
+
+async function refreshAsyncDesk(){
+  if(!currentAdv) return;
+  var ciclo = await getOrCreateCycle(currentAdv);
+  ciclo = await fecharCicloSeNecessario(currentAdv.id, ciclo);
+  asyncCurrentCycle = ciclo;
+  el("async-subtitle").textContent = "Dia "+ciclo.cycleNumber+" · "+ciclo.cycleId;
+  renderAsyncCycleCard();
+  asyncOrdersCache = await minhasOrdensNoCiclo(currentAdv.id, ciclo.cycleId);
+  renderAsyncOrders();
+}
+
+function tickAsyncCycle(){
+  if(view!=="async" || !asyncCurrentCycle) return;
+  renderAsyncCycleCard();
+  if(asyncCurrentCycle.status==="collecting" && agoraServidor()>=asyncCurrentCycle.closesAt){
+    refreshAsyncDesk();
+  }
+}
+
+function renderAsyncCycleCard(){
+  var ciclo = asyncCurrentCycle;
+  if(!ciclo) return;
+  var badge = el("async-cycle-badge"), countdown = el("async-cycle-countdown"), hint = el("async-cycle-hint");
+  badge.textContent = "Dia "+ciclo.cycleNumber;
+  if(ciclo.status==="collecting"){
+    var restante = ciclo.closesAt - agoraServidor();
+    countdown.textContent = "Ordens abertas — fecham em "+fmtDuracaoLonga(restante);
+    hint.textContent = "Envie e edite suas ordens à vontade até o fechamento. Depois disso elas ficam travadas.";
+  } else {
+    countdown.textContent = "Ordens encerradas";
+    hint.textContent = "O ciclo de hoje já fechou e está aguardando o Mestre resolver as ordens — essa parte da aventura (motor de resolução automática) ainda está em construção.";
+  }
+  el("async-new-order").disabled = ciclo.status!=="collecting";
+  el("async-new-order").style.opacity = ciclo.status!=="collecting" ? .5 : 1;
+}
+
+var PRIORIDADE_LABEL = {baixa:"Baixa", normal:"Normal", alta:"Alta"};
+function renderAsyncOrders(){
+  var box = el("async-orders-list");
+  if(!asyncOrdersCache.length){ box.innerHTML = '<p class="empty-hint">Você ainda não enviou nenhuma ordem hoje.</p>'; return; }
+  var podeEditar = asyncCurrentCycle && asyncCurrentCycle.status==="collecting";
+  box.innerHTML = asyncOrdersCache.map(function(o){
+    var locked = o.status!=="submitted";
+    return '<div class="async-order-card'+(locked?' locked':'')+'" data-id="'+o.id+'">'+
+      '<div class="async-order-top"><span class="async-order-seq">Ordem '+o.sequence+'</span>'+
+      '<span class="async-order-priority '+esc(o.priority)+'">'+esc(PRIORIDADE_LABEL[o.priority]||o.priority)+'</span></div>'+
+      '<p class="async-order-text">'+esc(o.text)+'</p>'+
+      (o.conditions&&o.conditions.length ? '<p class="async-order-meta">Se: '+esc(o.conditions.join("; "))+'</p>' : '')+
+      (o.fallback ? '<p class="async-order-meta">Senão: '+esc(o.fallback)+'</p>' : '')+
+      (locked ? '<span class="async-order-status-tag">'+(o.status==="locked"?"Travada para resolução":o.status)+'</span>' :
+        '<div class="async-order-actions">'+
+        (podeEditar ? '<button type="button" data-act="edit">Editar</button><button type="button" data-act="cancel">Cancelar</button>' : '')+
+        '</div>')+
+      '</div>';
+  }).join("");
+  Array.from(box.querySelectorAll(".async-order-card")).forEach(function(card){
+    var id = card.getAttribute("data-id");
+    var editBtn = card.querySelector('[data-act="edit"]');
+    var cancelBtn = card.querySelector('[data-act="cancel"]');
+    if(editBtn) editBtn.addEventListener("click", function(){ openOrderEditor(id); });
+    if(cancelBtn) cancelBtn.addEventListener("click", async function(){
+      if(!confirm("Cancelar esta ordem?")) return;
+      try{ await cancelarOrdem(currentAdv.id, asyncCurrentCycle.cycleId, id); await refreshAsyncDesk(); }
+      catch(err){ alert(err.message); }
+    });
+  });
+}
+
+function openOrderEditor(orderId){
+  asyncEditingOrderId = orderId || null;
+  var errBox = el("order-editor-error"); errBox.classList.add("hidden");
+  if(orderId){
+    var ordem = asyncOrdersCache.filter(function(o){ return o.id===orderId; })[0];
+    el("order-editor-title").textContent = "Editar ordem";
+    el("order-text").value = ordem ? ordem.text : "";
+    el("order-priority").value = ordem ? ordem.priority : "normal";
+    el("order-condition").value = ordem && ordem.conditions && ordem.conditions[0] || "";
+    el("order-fallback").value = (ordem && ordem.fallback) || "";
+  } else {
+    el("order-editor-title").textContent = "Nova ordem";
+    el("order-text").value = ""; el("order-priority").value = "normal";
+    el("order-condition").value = ""; el("order-fallback").value = "";
+  }
+  el("order-editor-overlay").classList.remove("hidden");
+}
+el("async-new-order").addEventListener("click", function(){ openOrderEditor(null); });
+el("order-editor-close").addEventListener("click", function(){ el("order-editor-overlay").classList.add("hidden"); });
+el("order-editor-cancel").addEventListener("click", function(){ el("order-editor-overlay").classList.add("hidden"); });
+el("order-editor-overlay").addEventListener("click", function(e){ if(e.target===el("order-editor-overlay")) el("order-editor-overlay").classList.add("hidden"); });
+el("order-editor-save").addEventListener("click", async function(){
+  var errBox = el("order-editor-error"); errBox.classList.add("hidden");
+  var text = el("order-text").value.trim();
+  if(!text){ errBox.textContent = "Descreva o que seu personagem vai tentar fazer."; errBox.classList.remove("hidden"); return; }
+  var campos = {
+    text: text, priority: el("order-priority").value,
+    conditions: el("order-condition").value.trim() ? [el("order-condition").value.trim()] : [],
+    fallback: el("order-fallback").value.trim()
+  };
+  var btn = el("order-editor-save"); btn.disabled = true; btn.textContent = "Salvando…";
+  try{
+    if(asyncEditingOrderId) await atualizarOrdem(currentAdv.id, asyncCurrentCycle.cycleId, asyncEditingOrderId, campos);
+    else await criarOrdem(currentAdv.id, asyncCurrentCycle.cycleId, mySceneId(currentAdv), campos);
+    el("order-editor-overlay").classList.add("hidden");
+    await refreshAsyncDesk();
+  }catch(err){ errBox.textContent = err.message; errBox.classList.remove("hidden"); }
+  finally{ btn.disabled=false; btn.textContent="Salvar ordem"; }
+});
+
 
 function temPlanoPago(email){
   var norm = normEmail(email);
