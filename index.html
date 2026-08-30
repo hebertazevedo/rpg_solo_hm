@@ -608,6 +608,18 @@ a{color:var(--arcane-bright);}
 .async-history-row:hover{border-color:var(--arcane-bright);}
 .async-history-row .ahr-date{font-size:11px;color:var(--text-lo);}
 .async-history-back{font-size:12px;color:var(--arcane-bright);background:none;border:none;cursor:pointer;padding:0 0 10px;}
+.async-cycle-card.urgente{border-color:#e0b34155;}
+#async-notify-btn.on{color:var(--arcane-bright);}
+.async-toast-container{position:fixed;top:66px;left:50%;transform:translateX(-50%);z-index:60;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;width:100%;padding:0 16px;}
+.async-toast{background:#22232c;border:1px solid var(--arcane-bright);color:var(--text-hi);font-size:12.5px;padding:10px 16px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.35);max-width:420px;text-align:center;animation:async-toast-in .2s ease-out;}
+@keyframes async-toast-in{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:translateY(0);}}
+.plan-status-card{border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:0 0 16px;background:linear-gradient(180deg,#1b1c24,#16171d);}
+.plan-status-card .psc-title{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-lo);margin:0 0 6px;}
+.plan-status-card .psc-plan{font-size:15px;font-weight:700;color:var(--text-hi);margin:0 0 8px;}
+.plan-status-card .psc-plan.apoiador{color:var(--brass-bright);}
+.plan-status-card ul{margin:0 0 10px;padding-left:18px;font-size:12.5px;color:var(--text-lo);line-height:1.7;}
+.plan-status-card ul li.liberado{color:var(--text-hi);}
+.plan-status-card .psc-expira{font-size:11.5px;color:var(--text-lo);}
 .add-invite-btn:hover{border-color:var(--arcane);}
 .warn-line{font-size:11px;color:var(--brass-bright);margin-top:4px;}
 .mode-toggle{display:flex;gap:8px;margin-top:8px;}
@@ -798,6 +810,7 @@ a{color:var(--arcane-bright);}
  </header>
  <div class="hub-scroll">
  <div class="hub-header"><div class="info"><h1 id="hub-greeting">Olá</h1><p data-i18n="hub.sub">Escolha uma aventura ou comece uma nova</p></div></div>
+ <div class="plan-status-card" id="plan-status-card"></div>
  <div class="char-card" id="hub-char-card"></div>
  <div class="continue-box hidden" id="continue-box"></div>
  <div class="action-grid">
@@ -991,10 +1004,14 @@ a{color:var(--arcane-bright);}
  </button>
  <div class="brand-text"><b id="async-title">Aventura assíncrona</b><span id="async-subtitle">Ciclo diário</span></div>
  <div class="spacer" style="flex:1;"></div>
+ <button class="icon-btn hidden" id="async-notify-btn" title="Ativar notificações de prazo" aria-label="Ativar notificações de prazo">
+ <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+ </button>
  <button class="icon-btn" id="async-history-btn" title="Histórico da aventura" aria-label="Histórico da aventura">
  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
  </button>
  </header>
+ <div id="async-toast-container" class="async-toast-container"></div>
  <main id="async-layout" class="async-layout">
   <div class="async-cycle-card" id="async-cycle-card">
    <div class="async-cycle-row">
@@ -1379,20 +1396,43 @@ var ADMIN_EMAIL = "azevedo.hebert@gmail.com";
    nada além destas linhas.
 
    IMPORTANTE — o que este app faz e o que ele NÃO faz:
-   Não existe processamento de cartão nem confirmação automática de
-   pagamento aqui dentro (isso exigiria um backend com chave secreta
-   de um processador de pagamentos, e este app não tem servidor
-   próprio). O fluxo é: o jogador paga por um destes canais externos,
-   avisa pelo botão "Já paguei" dentro do app, e o ADMINISTRADOR
-   confirma manualmente no Painel Admin → Solicitações de upgrade.
-   Isso é seguro (nada é liberado sem uma ação explícita do admin) e
-   é a mesma abordagem que apps solo/indie costumam usar antes de
-   automatizar a cobrança com um backend próprio.
+   Este arquivo sozinho (HTML/JS estático) nunca processa cartão nem
+   confirma pagamento — isso exige um backend com uma chave secreta de
+   processador de pagamentos, que não pode viver no navegador. A partir
+   da Fase 8 da especificação, essa confirmação passou a ser automática
+   de verdade: um Cloud Function separado (pacote "functions/", fora
+   deste arquivo — ver README.md) recebe o Webhook do Mercado Pago,
+   consulta o pagamento na API deles e ativa `subscription:<email>`
+   sozinho, sem nenhuma ação humana, contanto que o e-mail de quem pagou
+   bata com o e-mail cadastrado no app (ver seção "associação de
+   pagamento" no README). Quando não bate — pessoa pagou com um e-mail
+   diferente do Google usado para logar — o pagamento cai numa fila de
+   "não identificados" no Painel Admin, pra associação manual.
+   O fluxo manual abaixo ("Já paguei" → aprovação no Painel Admin)
+   continua existindo como respaldo: cobre pagamento combinado por
+   fora, cortesia, correção de erro, ou o caso do e-mail não bater.
    ========================================================= */
-var PRECO_PLANO_TEXTO = "";        // ex.: "R$ 14,90/mês" — texto livre, só para exibição
+var PRECO_PLANO_TEXTO = "";        // ex.: "R$ 14,90/mês" — texto livre, só para exibição. [a confirmar]: preço e periodicidade reais do plano.
 var PAGAMENTO_PIX_CHAVE = "";      // ex.: "seuemail@exemplo.com", CPF/CNPJ ou telefone
 var PAGAMENTO_PIX_NOME = "";       // nome do recebedor, mostrado junto da chave Pix
-var PAGAMENTO_LINK_CARTAO = "";    // ex.: link de pagamento do Stripe/Mercado Pago/PagSeguro/Kirvano
+var PAGAMENTO_LINK_CARTAO = "https://mpago.la/2mz2PXK";    // link de pagamento do Mercado Pago informado na especificação
+var FEATURES_PAGAS = ["grupo_async","resolucao_automatica","historico_avancado","oficina","exportacao","arquivo_completo"]; // spec seção 51 — catálogo real ainda [a confirmar]
+/* Autorização de recurso pago (spec seção 53): gate único usado tanto
+   pela UI (esconder/travar botão) quanto por qualquer checagem antes de
+   liberar uma ação. Hoje só existe UM nível pago ("apoiador"), então
+   isto equivale a temPlanoPago() — mas fica centralizado aqui para o
+   dia em que existirem níveis diferentes de plano, sem precisar caçar
+   cada chamada de temPlanoPago() espalhada pelo app. IMPORTANTE: isto
+   continua sendo uma checagem só do LADO DO CLIENTE — o app grava
+   direto no Firestore, então a garantia real de "ninguém libera plano
+   pago sem pagar" está nas regras de segurança do Firestore (só o
+   Cloud Function do webhook e o e-mail do admin podem escrever em
+   subscription:<email> — ver firestore.rules), não nesta função. */
+function subscriptionAllows(email, feature){
+  if(normEmail(email)===ADMIN_EMAIL) return true;
+  if(FEATURES_PAGAS.indexOf(feature)===-1) return true; // recurso não está na lista paga: liberado pra todos
+  return temPlanoPago(email);
+}
 var SHEETS_URL = "https://script.google.com/macros/s/AKfycbxmw5O3rNuFOYStis1ShHG04-eCD5iJLY-J-rPTDanY2WNmIo0rPFKaSfggnkGOuQ8t/exec";
 var adminConfig = null; // {sheetsWebhookUrl}
 
@@ -1747,7 +1787,7 @@ function isSyncedKey(key){
  // P3 (nova auditoria, seção 19 — presença/"digitando"): presence: e
  // typing: também precisam sincronizar, senão cada jogador só vê a
  // própria presença/digitação, nunca a dos outros.
- return /^(pub:|character:|adv:|member-adv:|scene-msgs:|pending-action:|check:|admin-config|event:|events-index|event-log:|market:|market-index|market-treasury|crafted:|producao:|ledger:|forge-chat:|turno:|iteminfo:|producao:|subscription:|upgrade-request:|presence:|typing:|cycle:|cycle-lock:|cycle-result:|cycle-result-index:|order:|orders-index:)/.test(key);
+ return /^(pub:|character:|adv:|member-adv:|scene-msgs:|pending-action:|check:|admin-config|event:|events-index|event-log:|market:|market-index|market-treasury|crafted:|producao:|ledger:|forge-chat:|turno:|iteminfo:|producao:|subscription:|upgrade-request:|presence:|typing:|cycle:|cycle-lock:|cycle-result:|cycle-result-index:|order:|orders-index:|payment:|payment-unmatched:)/.test(key);
 }
 /* Values are stored wrapped as {__v:rev, __t:ts, d:data} so a stale or failed
  remote write can never overwrite newer local data on screen. */
@@ -2804,6 +2844,7 @@ async function enterHub(){
  var upBtn = el("hub-upgrade");
  upBtn.classList.toggle("apoiador", !!session.planoPago);
  upBtn.title = session.planoPago ? "Você é Apoiador ✓" : "Plano Apoiador";
+ await renderPlanStatusCard();
  // rele a ficha: o ouro pode ter sido creditado por uma venda enquanto
  // este jogador estava parado no hub
  var fichaAtual = await sGet("character:"+session.email, true);
@@ -3079,10 +3120,13 @@ function openNewAdvModal(){
  for(var i=0;i<radios.length;i++) radios[i].checked = (radios[i].value==="sync");
  var asyncOpt = el("newadv-groupmode-async-opt");
  var asyncRadio = document.querySelector('input[name="newadv-groupmode"][value="async"]');
- if(!GRUPO_ASYNC_DISPONIVEL){
+ var asyncLiberado = GRUPO_ASYNC_DISPONIVEL && subscriptionAllows(session.email, "grupo_async");
+ if(!asyncLiberado){
    asyncOpt.classList.add("locked");
    asyncRadio.disabled = true;
-   asyncOpt.title = "Em breve — o motor de resolução assíncrona ainda está em desenvolvimento.";
+   asyncOpt.title = !GRUPO_ASYNC_DISPONIVEL
+     ? "Em breve — o motor de resolução assíncrona ainda está em desenvolvimento."
+     : "Recurso do Plano Apoiador — assine para desbloquear.";
  } else {
    asyncOpt.classList.remove("locked");
    asyncRadio.disabled = false;
@@ -3112,6 +3156,13 @@ el("newadv-create").addEventListener("click", async function(){
  if(groupMode==="async" && !GRUPO_ASYNC_DISPONIVEL){
    errBox.textContent="O grupo assíncrono ainda está em desenvolvimento. Por enquanto, crie uma aventura em grupo síncrono.";
    errBox.classList.remove("hidden");
+   return;
+ }
+ if(groupMode==="async" && !subscriptionAllows(session.email, "grupo_async")){
+   errBox.innerHTML = 'O grupo assíncrono é um recurso do Plano Apoiador. <a href="#" id="newadv-upgrade-link-async">Ver planos</a>';
+   errBox.classList.remove("hidden");
+   var upLA = el("newadv-upgrade-link-async");
+   if(upLA) upLA.addEventListener("click", function(e){ e.preventDefault(); abrirUpgrade("grupo_async"); });
    return;
  }
  var btn = el("newadv-create"); btn.disabled=true; btn.textContent="Criando…";
@@ -5912,6 +5963,7 @@ async function enterAsyncDesk(advId, preloaded){
   character = await sGet("character:"+session.email, true) || character;
   el("async-title").textContent = adv.name;
   showView("async");
+  atualizarBotaoNotificacao();
   await refreshAsyncDesk();
   if(asyncTickTimer) clearInterval(asyncTickTimer);
   asyncTickTimer = setInterval(tickAsyncCycle, 1000);
@@ -5919,6 +5971,15 @@ async function enterAsyncDesk(advId, preloaded){
 el("async-back").addEventListener("click", function(){
   if(asyncTickTimer){ clearInterval(asyncTickTimer); asyncTickTimer=null; }
   currentAdv = null; enterHub();
+});
+el("async-notify-btn").addEventListener("click", async function(){
+  if(typeof Notification==="undefined") return;
+  if(Notification.permission==="default"){
+    try{ await Notification.requestPermission(); }catch(e){}
+  } else if(Notification.permission==="denied"){
+    alert("As notificações estão bloqueadas nas configurações do navegador para este site. Ative manualmente nas permissões do site para receber os alertas de prazo.");
+  }
+  atualizarBotaoNotificacao();
 });
 
 async function refreshAsyncDesk(){
@@ -5954,19 +6015,89 @@ function tickAsyncCycle(){
 }
 
 var STATUS_CICLO_LABEL = {
-  collecting: "🟢 Ordens abertas", closing: "🔒 Ordens encerradas",
+  collecting: "🟢 Ordens abertas", collecting_urgente: "🟡 Ordens abertas", closing: "🔒 Ordens encerradas",
   resolving: "⚙ O Mestre está resolvendo o dia…", resolved: "📖 Resultado do dia disponível",
   error: "⚠ Algo falhou ao resolver o dia"
 };
+/* Fase 9 — seção 13: alertas progressivos de prazo, configuráveis pelo
+   administrador (Painel Admin → Alertas de prazo). Os valores abaixo
+   são exatamente os sugeridos pela especificação. */
+var ALERTAS_PRAZO_PADRAO = [
+  {min:720, msg:"Seu dia de aventura termina às 23:59."},
+  {min:360, msg:"Você ainda possui decisões pendentes."},
+  {min:180, msg:"Ainda há ações para definir."},
+  {min:60,  msg:"Última hora para alterar suas ordens."},
+  {min:30,  msg:"O fechamento está próximo."},
+  {min:15,  msg:"Você possui decisões não respondidas."},
+  {min:5,   msg:"O Mestre assumirá automaticamente as pendências."}
+];
+function obterAlertasPrazoConfigurados(){
+  var cfg = adminConfig && Array.isArray(adminConfig.alertasPrazo) ? adminConfig.alertasPrazo : null;
+  if(cfg && cfg.length) return cfg;
+  return ALERTAS_PRAZO_PADRAO;
+}
+/* cycleId -> Set de "min" já disparados nesta sessão do navegador —
+   não precisa persistir: é só pra não repetir o mesmo aviso a cada
+   tick de 1s enquanto o jogador está com a tela aberta. */
+var asyncAlertasMostrados = {};
+function verificarAlertasPrazo(ciclo){
+  if(!ciclo || ciclo.status!=="collecting") return;
+  if(!asyncAlertasMostrados[ciclo.cycleId]) asyncAlertasMostrados[ciclo.cycleId] = {};
+  var jaMostrados = asyncAlertasMostrados[ciclo.cycleId];
+  var minutosRestantes = (ciclo.closesAt - agoraServidor())/60000;
+  obterAlertasPrazoConfigurados().forEach(function(a){
+    if(jaMostrados[a.min]) return;
+    if(minutosRestantes<=a.min && minutosRestantes>0){
+      jaMostrados[a.min] = true;
+      mostrarToastAsync("⏳ "+a.msg);
+      notificarNavegador("Mestre Solo — "+(currentAdv?currentAdv.name:"Aventura"), a.msg);
+    }
+  });
+}
+/* Toast dentro da tela do ciclo assíncrono — mesmo espírito do
+   showXpToast() do jogo síncrono, mas anexado ao layout assíncrono. */
+function mostrarToastAsync(mensagem){
+  var box = el("async-toast-container");
+  if(!box) return;
+  var d = document.createElement("div");
+  d.className = "async-toast";
+  d.textContent = mensagem;
+  box.appendChild(d);
+  setTimeout(function(){ if(d.parentNode) d.remove(); }, 8000);
+}
+/* Notificação nativa do navegador (Web Notifications API) — funciona
+   mesmo com a aba em segundo plano, sem precisar de nenhum backend de
+   push. Só dispara se o jogador já concedeu permissão explicitamente
+   (ver botão de sino no cabeçalho da tela assíncrona); nunca pede
+   permissão sozinho fora de um clique direto do jogador. */
+function notificarNavegador(titulo, corpo){
+  try{
+    if(typeof Notification==="undefined") return;
+    if(Notification.permission!=="granted") return;
+    if(!document.hidden) return; // aba já está em foco — o toast já basta
+    new Notification(titulo, {body:corpo, icon:"", tag:"mestre-solo-prazo"});
+  }catch(e){ /* navegadores sem suporte (ex.: iOS Safari) — ignora silenciosamente */ }
+}
+function atualizarBotaoNotificacao(){
+  var btn = el("async-notify-btn");
+  if(!btn || typeof Notification==="undefined"){ if(btn) btn.classList.add("hidden"); return; }
+  btn.classList.remove("hidden");
+  btn.classList.toggle("on", Notification.permission==="granted");
+  btn.title = Notification.permission==="granted" ? "Notificações ativadas" : "Ativar notificações de prazo";
+}
 function renderAsyncCycleCard(){
   var ciclo = asyncCurrentCycle;
   if(!ciclo) return;
   var badge = el("async-cycle-badge"), countdown = el("async-cycle-countdown"), hint = el("async-cycle-hint");
   badge.textContent = "Dia "+ciclo.cycleNumber;
+  el("async-cycle-card").className = "async-cycle-card"; // reset antes de reaplicar o estado
   if(ciclo.status==="collecting"){
     var restante = ciclo.closesAt - agoraServidor();
-    countdown.textContent = STATUS_CICLO_LABEL.collecting+" — fecham em "+fmtDuracaoLonga(restante);
+    var urgente = restante <= 60*60*1000; // menos de 1h — seção 39: 🟡
+    countdown.textContent = (urgente?STATUS_CICLO_LABEL.collecting_urgente:STATUS_CICLO_LABEL.collecting)+" — fecham em "+fmtDuracaoLonga(restante);
     hint.textContent = "Envie e edite suas ordens à vontade até o fechamento. Depois disso elas ficam travadas.";
+    el("async-cycle-card").classList.toggle("urgente", urgente);
+    verificarAlertasPrazo(ciclo);
   } else if(ciclo.status==="closing"){
     countdown.textContent = STATUS_CICLO_LABEL.closing;
     hint.textContent = session.apiKey ? "Resolvendo assim que possível…" : "Aguardando alguém com a chave do Gemini configurada abrir a aventura para o Mestre resolver o dia.";
@@ -6215,13 +6346,41 @@ function temPlanoPago(email){
    admin sem exigir logout — mas o valor em si fica em session.planoPago,
    então temPlanoPago() continua síncrona e todo o resto do app não
    precisa mudar (ver comentário original abaixo). */
-async function carregarPlanoPago(){
+async function carregarPlanoPago(forcar){
   if(normEmail(session.email) === ADMIN_EMAIL){ session.planoPago = true; return true; }
   try{
+    if(forcar) cacheInvalidate("subscription:"+session.email);
     var sub = await sGet("subscription:"+session.email, true);
     session.planoPago = !!(sub && sub.ativo && (!sub.expiraEm || sub.expiraEm > Date.now()));
   }catch(e){ /* falha de rede não deve travar o boot — mantém o último valor conhecido */ }
   return !!session.planoPago;
+}
+/* Fase 9 — seção 56: cartão de status do plano no topo do hub. Feito
+   pra ser lido rápido: o que já está liberado, o que falta, e quando
+   expira se for pago. */
+async function renderPlanStatusCard(){
+  var card = el("plan-status-card");
+  if(!card) return;
+  var sub = await sGet("subscription:"+session.email, true);
+  var apoiador = !!session.planoPago;
+  var expiraEm = sub && (sub.expiresAt || sub.expiraEm);
+  var html = '<p class="psc-title">Plano atual</p>';
+  html += '<p class="psc-plan'+(apoiador?' apoiador':'')+'">'+(apoiador?'✓ Apoiador':'Gratuito')+'</p>';
+  html += '<ul>'+
+    '<li class="'+(true?'liberado':'')+'">Aventuras solo e em grupo síncronas</li>'+
+    '<li class="'+(apoiador?'liberado':'')+'">'+(apoiador?'✓':'🔒')+' Aventuras em grupo assíncronas</li>'+
+    '<li class="'+(apoiador?'liberado':'')+'">'+(apoiador?'✓':'🔒')+' Produção na Oficina e exportação em PDF</li>'+
+    '</ul>';
+  if(apoiador){
+    html += expiraEm
+      ? '<p class="psc-expira">Expira em: '+new Date(expiraEm).toLocaleDateString("pt-BR")+'</p>'
+      : '<p class="psc-expira">Sem data de expiração.</p>';
+  } else {
+    html += '<div class="card-actions"><button type="button" class="ghost-btn" id="plan-status-cta">Conhecer plano pago</button></div>';
+  }
+  card.innerHTML = html;
+  var cta = el("plan-status-cta");
+  if(cta) cta.addEventListener("click", function(){ abrirUpgrade(); });
 }
 function podeProduzirItens(email){ return temPlanoPago(email); }
 /* O administrador produz sem catálogo, sem teste e sem espera: precisa poder
@@ -6254,7 +6413,8 @@ var MOTIVOS_UPGRADE = {
   oficina: "A produção de itens na oficina é um recurso do Plano Apoiador.",
   exportacao: "Exportar a crônica em PDF é um recurso do Plano Apoiador.",
   limite_aventuras: "Você atingiu o limite de aventuras simultâneas do plano gratuito.",
-  arquivo: "Ver todo o histórico de aventuras concluídas é um recurso do Plano Apoiador."
+  arquivo: "Ver todo o histórico de aventuras concluídas é um recurso do Plano Apoiador.",
+  grupo_async: "Aventuras em grupo assíncronas são um recurso do Plano Apoiador."
 };
 async function abrirUpgrade(origem){
   el("upgrade-overlay").classList.remove("hidden");
@@ -6290,16 +6450,32 @@ async function renderUpgradeBody(origem){
     }
     if(PAGAMENTO_LINK_CARTAO){
       metodos += '<a class="pay-method" href="'+esc(PAGAMENTO_LINK_CARTAO)+'" target="_blank" rel="noopener" id="upgrade-link-cartao">'+
-        '<span class="pm-icon">💳</span><div class="pm-info"><b>Cartão / outros meios</b><span>Abre uma página de pagamento segura</span></div></a>';
+        '<span class="pm-icon">💳</span><div class="pm-info"><b>Mercado Pago</b><span>Ativação automática em poucos instantes após o pagamento</span></div></a>';
     }
     if(!metodos){
       metodos = '<p class="modal-note">Nenhum meio de pagamento configurado ainda — fale diretamente com o administrador.</p>';
     }
     html += metodos;
-    html += '<div class="card-actions" style="margin-top:14px;">'+
-      '<button type="button" class="primary-btn" id="upgrade-ja-paguei">Já paguei — avisar o administrador</button></div>';
+    if(PAGAMENTO_LINK_CARTAO){
+      html += '<div class="card-actions" style="margin-top:10px;"><button type="button" class="ghost-btn" id="upgrade-verificar" style="width:100%;">Já paguei pelo Mercado Pago — verificar agora</button></div>';
+    }
+    html += '<div class="card-actions" style="margin-top:8px;">'+
+      '<button type="button" class="primary-btn" id="upgrade-ja-paguei">Paguei por outro meio — avisar o administrador</button></div>';
   }
   body.innerHTML = html;
+  var verificar = el("upgrade-verificar");
+  if(verificar) verificar.addEventListener("click", async function(){
+    verificar.disabled = true; var txt0 = verificar.textContent; verificar.textContent = "Verificando…";
+    await carregarPlanoPago(true);
+    if(temPlanoPago(session.email)) renderUpgradeBody(origem);
+    else {
+      verificar.disabled = false; verificar.textContent = txt0;
+      var errN = document.createElement("p");
+      errN.className = "hint"; errN.style.marginTop="8px";
+      errN.textContent = "Ainda não identificamos seu pagamento. Se pagou com um e-mail diferente do que você usa aqui no app, use o botão abaixo pra avisar o administrador.";
+      verificar.parentNode.appendChild(errN);
+    }
+  });
   var pix = el("upgrade-pix-copiar");
   if(pix) pix.addEventListener("click", function(){
     var texto = el("upgrade-pix-chave").textContent;
@@ -6332,6 +6508,7 @@ async function renderUpgradeBody(origem){
 function renderListaBeneficios(){
   return '<ul class="plan-benefits">'+
     '<li>Aventuras simultâneas ilimitadas (grátis: '+LIMITE_AVENTURAS_ATIVAS+')</li>'+
+    '<li>Aventuras em grupo assíncronas (ordens ao longo do dia, resolução automática à meia-noite)</li>'+
     '<li>Produção de itens na Oficina</li>'+
     '<li>Exportação da crônica da aventura em PDF</li>'+
     '<li>Histórico completo de aventuras concluídas (grátis: últimas '+LIMITE_ARQUIVO_GRATUITO+')</li>'+
@@ -8343,6 +8520,9 @@ async function openAdmin(){
     var advKeys = await sList("adv:", true);
     var upgradeKeys = await sList("upgrade-request:", true);
     var upgradeReqs = (await Promise.all(upgradeKeys.map(function(k){ return sGet(k, true); }))).filter(Boolean);
+    var pagamentosNaoIdentificadosKeys = await sList("payment-unmatched:", true);
+    var pagamentosNaoIdentificados = (await Promise.all(pagamentosNaoIdentificadosKeys.map(function(k){ return sGet(k, true); })))
+      .filter(function(p){ return p && !p.resolved; });
     var users = (await Promise.all(userKeys.map(function(k){ return sGet(k, true); }))).filter(Boolean);
     var advs = (await Promise.all(advKeys.map(function(k){ return sGet(k, true); }))).filter(Boolean);
     var chars = (await Promise.all(users.map(function(u){
@@ -8445,6 +8625,15 @@ async function openAdmin(){
         '</select>'+
         '<button type="button" class="ghost-btn" id="admin-narratividade-salvar">Salvar</button>'+
       '</div><p class="hint" id="admin-narratividade-status"></p></div>';
+
+    /* ===== alertas de prazo do grupo assíncrono (Fase 9, spec seção 13) ===== */
+    html += '<div class="adm-section"><h4>Alertas de prazo (grupo assíncrono)</h4>'+
+      '<p class="adm-note">Um aviso por linha, no formato <code>minutos antes do fechamento|mensagem</code>. Disparam como notificação dentro da tela do ciclo diário para cada jogador.</p>'+
+      '<textarea id="admin-alertas-prazo" class="text-input" rows="7" style="margin-top:8px;font-family:var(--font-mono);font-size:12px;"></textarea>'+
+      '<div class="input-with-btn" style="margin-top:8px;">'+
+        '<button type="button" class="ghost-btn" id="admin-alertas-salvar" style="flex:1;">Salvar alertas</button>'+
+        '<button type="button" class="ghost-btn" id="admin-alertas-restaurar">Restaurar padrão</button>'+
+      '</div><p class="hint" id="admin-alertas-status"></p></div>';
 
     /* ===== funil ===== */
     var funilMax = users.length || 1;
@@ -8554,6 +8743,32 @@ async function openAdmin(){
       '<p class="hint">Use isto para casos fora do fluxo normal (ex.: pagamento combinado por fora, cortesia, correção).</p>';
     html += '</div>';
 
+    /* ===== pagamentos do Mercado Pago não identificados (Fase 8) =====
+       O Webhook (functions/) já confirmou que o pagamento foi aprovado,
+       mas o e-mail de quem pagou não bate com nenhum e-mail cadastrado
+       no app — associar aqui equivale a aprovar manualmente, só que já
+       partindo de um pagamento comprovado pelo Mercado Pago, não de um
+       aviso não verificado do jogador. */
+    html += '<div class="adm-section"><h4>Pagamentos do Mercado Pago não identificados ('+pagamentosNaoIdentificados.length+')</h4>';
+    if(!pagamentosNaoIdentificados.length){
+      html += '<p class="modal-note">Nenhum pagamento pendente de associação.</p>';
+    } else {
+      html += '<p class="adm-note">O Mercado Pago confirmou estes pagamentos, mas o e-mail de quem pagou não bate com nenhuma conta cadastrada. Informe o e-mail correto do jogador para liberar o plano.</p><div class="adm-list">';
+      pagamentosNaoIdentificados.forEach(function(p){
+        html += '<div class="party-row" style="border-color:var(--line-soft);flex-wrap:wrap;">'+
+          '<span class="pv" style="background:var(--brass-dim);"></span>'+
+          '<span class="pn"><b style="color:var(--text-hi)">'+esc(p.payerEmail||"e-mail não informado pelo Mercado Pago")+'</b>'+
+          '<span style="color:var(--text-faint)">pagamento '+esc(p.paymentId)+' · '+
+          (p.amount!=null?("R$ "+Number(p.amount).toFixed(2).replace(".", ",")+" · "):"")+
+          new Date(p.createdAt).toLocaleDateString("pt-BR")+'</span></span>'+
+          '<input type="email" class="text-input" style="max-width:220px;" placeholder="e-mail cadastrado no app" id="assoc-email-'+esc(p.paymentId)+'" value="'+esc(p.payerEmail||"")+'">'+
+          '<button class="mk-btn" data-associar-pagamento="'+esc(p.paymentId)+'" style="padding:6px 10px;font-size:11px;">Associar e liberar</button>'+
+          '</div>';
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+
     /* ===== usuários ===== */
     html += '<div class="adm-section"><h4>Usuários ('+users.length+')</h4>';
     if(!users.length) html += '<p class="modal-note">Nenhum usuário ainda.</p>';
@@ -8607,6 +8822,43 @@ async function openAdmin(){
         narratBtn.disabled = false; narratBtn.textContent = "Salvar";
       }
     });
+    /* ---- alertas de prazo (Fase 9) ---- */
+    function alertasParaTexto(lista){
+      return lista.map(function(a){ return a.min+"|"+a.msg; }).join("\n");
+    }
+    function textoParaAlertas(texto){
+      return texto.split("\n").map(function(linha){
+        var i = linha.indexOf("|");
+        if(i<0) return null;
+        var min = parseInt(linha.slice(0,i).trim(),10);
+        var msg = linha.slice(i+1).trim();
+        if(!msg || isNaN(min) || min<=0) return null;
+        return {min:min, msg:msg};
+      }).filter(Boolean).sort(function(a,b){ return b.min-a.min; });
+    }
+    var alertasArea = el("admin-alertas-prazo");
+    if(alertasArea) alertasArea.value = alertasParaTexto(obterAlertasPrazoConfigurados());
+    var alertasBtn = el("admin-alertas-salvar");
+    if(alertasBtn) alertasBtn.addEventListener("click", async function(){
+      var status = el("admin-alertas-status");
+      var novaLista = textoParaAlertas(alertasArea.value);
+      if(!novaLista.length){ status.textContent = "Nenhum alerta válido — cada linha precisa ser \"minutos|mensagem\"."; return; }
+      alertasBtn.disabled = true; alertasBtn.textContent = "Salvando…";
+      try{
+        var freshCfg2 = await sGet("admin-config", true) || {};
+        adminConfig = Object.assign({}, freshCfg2, {alertasPrazo: novaLista});
+        await sSet("admin-config", adminConfig, true);
+        status.textContent = "Salvo — vale para os próximos ciclos assíncronos abertos.";
+      }catch(err){
+        status.textContent = "Falha ao salvar: "+(err.message||err);
+      }finally{
+        alertasBtn.disabled = false; alertasBtn.textContent = "Salvar alertas";
+      }
+    });
+    var alertasRestaurarBtn = el("admin-alertas-restaurar");
+    if(alertasRestaurarBtn) alertasRestaurarBtn.addEventListener("click", function(){
+      alertasArea.value = alertasParaTexto(ALERTAS_PRAZO_PADRAO);
+    });
     el("admin-body").querySelectorAll("[data-editar-ficha]").forEach(function(b){
       b.addEventListener("click", function(){ abrirEditorFicha(b.getAttribute("data-editar-ficha")); });
     });
@@ -8625,6 +8877,21 @@ async function openAdmin(){
         b.disabled = true;
         try{ await sSet("upgrade-request:"+email, {email:email, status:"recusado", resolvidoEm:Date.now(), resolvidoPor:session.email}, true); openAdmin(); }
         catch(err){ alert("Falha ao recusar: "+err.message); b.disabled=false; }
+      });
+    });
+    el("admin-body").querySelectorAll("[data-associar-pagamento]").forEach(function(b){
+      b.addEventListener("click", async function(){
+        var paymentId = b.getAttribute("data-associar-pagamento");
+        var input = el("assoc-email-"+paymentId);
+        var email = normEmail(input ? input.value : "");
+        if(!email){ alert("Informe o e-mail cadastrado no app para associar este pagamento."); return; }
+        b.disabled = true; b.textContent = "Associando…";
+        try{
+          await concederPlanoPago(email);
+          var registro = await sGet("payment-unmatched:"+paymentId, true);
+          if(registro){ registro.resolved = true; registro.resolvedEmail = email; registro.resolvedAt = Date.now(); registro.resolvedBy = session.email; await sSet("payment-unmatched:"+paymentId, registro, true); }
+          openAdmin();
+        }catch(err){ alert("Falha ao associar: "+err.message); b.disabled=false; b.textContent="Associar e liberar"; }
       });
     });
     var concederBtn = el("admin-upgrade-conceder"), revogarBtn = el("admin-upgrade-revogar");
