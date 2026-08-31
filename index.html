@@ -5360,6 +5360,18 @@ function limitesDoCiclo(diaStr){
   };
 }
 function cycleKey(advId, diaStr){ return "cycle:"+advId+":"+diaStr; }
+/* Uma resolução "trava" quando a aba/processo que a iniciou é
+   interrompido no meio (fechou a aba, rede caiu, celular suspendeu o
+   navegador) — nesse caso ninguém nunca escreve "resolved" nem "error",
+   e o status fica preso em "resolving" pra sempre. 4 minutos é bem mais
+   que o suficiente pra uma resolução de verdade terminar (duas chamadas
+   de IA por cena), então passado isso tratamos como abandonada e
+   liberamos uma nova tentativa. */
+var RESOLVING_TRAVADO_MS = 4*60*1000;
+function cicloResolvendoTravado(ciclo){
+  return !!ciclo && ciclo.status==="resolving" && !!ciclo.resolutionStartedAt &&
+    (agoraServidor()-ciclo.resolutionStartedAt) > RESOLVING_TRAVADO_MS;
+}
 /* Índice do diário (Fase 7 — "histórico", RF-015): a coleção "kv" não
    permite listar por prefixo sem trazer tudo, então mantemos um índice
    pequeno e explícito por aventura em vez de escanear a coleção
@@ -5963,7 +5975,16 @@ async function resolverCiclo(advId, cycleId){
   var key = cycleKey(advId, cycleId);
   try{
     var ciclo = await sGet(key, true);
-    if(!ciclo || ciclo.status!=="closing") return ciclo;
+    // Aceita retomar um ciclo travado em "resolving" (aba fechada, rede
+    // caiu, celular suspendeu o navegador no meio da resolução anterior
+    // — a única forma de isso acontecer, já que o try/finally abaixo
+    // sempre marca "resolved" ou "error" ao final de uma execução que
+    // conseguiu terminar). Sem isso, o ciclo fica preso pra sempre, sem
+    // que nem o botão do host nem o agendador consigam fazer nada — foi
+    // exatamente esse o bug relatado. Ordens já marcadas "resolved" na
+    // tentativa anterior são ignoradas aqui (só pegamos as "locked"),
+    // então retomar não duplica o que já tinha sido de fato concluído.
+    if(!ciclo || (ciclo.status!=="closing" && !cicloResolvendoTravado(ciclo))) return ciclo;
     ciclo.status = "resolving";
     ciclo.resolutionStartedAt = Date.now();
     await sSet(key, ciclo, true);
@@ -6082,8 +6103,14 @@ async function refreshAsyncDesk(){
   // chave Gemini configurada aqui (a resolução precisa da IA). Se
   // ninguém com chave configurada abrir o app, o ciclo fica em
   // "closing" até alguém abrir — a limitação inerente de não ter um
-  // backend de verdade, documentada desde a Fase 2.
-  if(ciclo && ciclo.status==="closing" && agoraServidor()>=ciclo.resolvesAt && session.apiKey){
+  // backend de verdade, documentada desde a Fase 2. O mesmo vale para
+  // um ciclo travado em "resolving" (ver cicloResolvendoTravado): tenta
+  // se recuperar sozinho quando alguém com chave passa por aqui, sem
+  // precisar que seja justamente o host a notar e clicar em algo.
+  if(ciclo && session.apiKey && (
+    (ciclo.status==="closing" && agoraServidor()>=ciclo.resolvesAt) ||
+    cicloResolvendoTravado(ciclo)
+  )){
     ciclo = await resolverCiclo(currentAdv.id, ciclo.cycleId) || ciclo;
   }
   asyncCurrentCycle = ciclo;
@@ -6096,8 +6123,9 @@ async function refreshAsyncDesk(){
   await renderAsyncResult();
   var resolverBtn = el("async-resolver-agora");
   var souHost = currentAdv.hostEmail===session.email;
-  var podeResolverAgora = souHost && ciclo && (ciclo.status==="collecting" || ciclo.status==="closing");
+  var podeResolverAgora = souHost && ciclo && (ciclo.status==="collecting" || ciclo.status==="closing" || cicloResolvendoTravado(ciclo));
   resolverBtn.classList.toggle("hidden", !podeResolverAgora);
+  resolverBtn.textContent = cicloResolvendoTravado(ciclo) ? "▶ Tentar resolver de novo (travou)" : "▶ Resolver o dia agora";
 }
 
 /* Contextualização do Mestre (ver gerarAberturaDeCiclo) — narrativa de
@@ -6133,13 +6161,17 @@ el("async-gerar-abertura").addEventListener("click", async function(){
   finally{ btn.disabled=false; btn.textContent=txt0; }
 });
 el("async-resolver-agora").addEventListener("click", async function(){
-  if(!confirm("Isso encerra as ordens de hoje agora mesmo (mesmo antes do horário normal, 23:59) e pede pro Mestre resolver o dia. Continuar?")) return;
+  var ciclo = asyncCurrentCycle;
+  var travado = cicloResolvendoTravado(ciclo);
+  var msg = travado
+    ? "A resolução anterior travou no meio. Isso vai tentar resolver o dia de novo — se a tentativa anterior já tinha aplicado alguma consequência antes de travar, ela não será desfeita, só o que faltou será refeito. Continuar?"
+    : "Isso encerra as ordens de hoje agora mesmo (mesmo antes do horário normal, 23:59) e pede pro Mestre resolver o dia. Continuar?";
+  if(!confirm(msg)) return;
   if(!session.apiKey){ alert("Configure sua chave do Gemini para resolver o dia agora."); return; }
   var btn = this; btn.disabled = true; var txt0 = btn.textContent; btn.textContent = "Resolvendo…";
   try{
-    var ciclo = asyncCurrentCycle;
     if(ciclo.status==="collecting") ciclo = await fecharCicloSeNecessario(currentAdv.id, ciclo, true);
-    if(ciclo && ciclo.status==="closing") await resolverCiclo(currentAdv.id, ciclo.cycleId);
+    if(ciclo && (ciclo.status==="closing" || cicloResolvendoTravado(ciclo))) await resolverCiclo(currentAdv.id, ciclo.cycleId);
     await refreshAsyncDesk();
   }catch(err){ alert("Falha ao resolver o dia: "+err.message); }
   finally{ btn.disabled=false; btn.textContent=txt0; }
@@ -6150,7 +6182,8 @@ function tickAsyncCycle(){
   renderAsyncCycleCard();
   var c = asyncCurrentCycle;
   if((c.status==="collecting" && agoraServidor()>=c.closesAt) ||
-     (c.status==="closing" && agoraServidor()>=c.resolvesAt && session.apiKey)){
+     (c.status==="closing" && agoraServidor()>=c.resolvesAt && session.apiKey) ||
+     (cicloResolvendoTravado(c) && session.apiKey)){
     refreshAsyncDesk();
   }
 }
@@ -6243,8 +6276,20 @@ function renderAsyncCycleCard(){
     countdown.textContent = STATUS_CICLO_LABEL.closing;
     hint.textContent = session.apiKey ? "Resolvendo assim que possível…" : "Aguardando alguém com a chave do Gemini configurada abrir a aventura para o Mestre resolver o dia.";
   } else if(ciclo.status==="resolving"){
-    countdown.textContent = STATUS_CICLO_LABEL.resolving;
-    hint.textContent = "O motor está rolando os testes e narrando o resultado de cada ordem. Isso leva alguns segundos.";
+    if(cicloResolvendoTravado(ciclo)){
+      countdown.textContent = "⚠ A resolução travou";
+      hint.innerHTML = "Começou há mais de "+Math.round(RESOLVING_TRAVADO_MS/60000)+" minutos e não terminou — provavelmente a aba de quem estava resolvendo fechou ou a conexão caiu no meio do processo. "+' <a href="#" id="async-retry-link-travado">tentar de novo</a>';
+      var retryTravado = el("async-retry-link-travado");
+      if(retryTravado) retryTravado.addEventListener("click", async function(e){
+        e.preventDefault();
+        if(!session.apiKey){ alert("Configure sua chave do Gemini para tentar de novo."); return; }
+        await resolverCiclo(currentAdv.id, ciclo.cycleId);
+        await refreshAsyncDesk();
+      });
+    } else {
+      countdown.textContent = STATUS_CICLO_LABEL.resolving;
+      hint.textContent = "O motor está rolando os testes e narrando o resultado de cada ordem. Isso leva alguns segundos.";
+    }
   } else if(ciclo.status==="resolved"){
     countdown.textContent = STATUS_CICLO_LABEL.resolved;
     hint.textContent = "Veja o resultado do dia abaixo. Um novo ciclo abre à meia-noite.";
