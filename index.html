@@ -51,6 +51,7 @@ if (window.__fbPending) {
       signInWithPopup: auth.signInWithPopup,
       signInWithRedirect: auth.signInWithRedirect,
       getRedirectResult: auth.getRedirectResult,
+      signInWithCredential: auth.signInWithCredential,
       signOut: auth.signOut,
       onAuthStateChanged: auth.onAuthStateChanged,
       doc: fs.doc, getDoc: fs.getDoc, setDoc: fs.setDoc, deleteDoc: fs.deleteDoc,
@@ -1439,7 +1440,60 @@ var ADMIN_EMAIL = "azevedo.hebert@gmail.com";
 var PRECO_PLANO_TEXTO = "";        // ex.: "R$ 14,90/mês" — texto livre, só para exibição. [a confirmar]: preço e periodicidade reais do plano.
 var PAGAMENTO_PIX_CHAVE = "";      // ex.: "seuemail@exemplo.com", CPF/CNPJ ou telefone
 var PAGAMENTO_PIX_NOME = "";       // nome do recebedor, mostrado junto da chave Pix
-var PAGAMENTO_LINK_CARTAO = "https://mpago.la/2mz2PXK";    // link de pagamento do Mercado Pago informado na especificação
+var PAGAMENTO_LINK_CARTAO = "https://mpago.la/2mz2PXK";    // link de pagamento do Mercado Pago informado na especificação — só usado FORA do app nativo (ver nota abaixo)
+/* ASSINATURA DENTRO DO APP NATIVO (Android/Play Store): a política da
+   Google Play exige que qualquer recurso pago consumido dentro do
+   próprio app passe pelo Google Play Billing — um link de pagamento
+   externo como o do Mercado Pago acima é motivo comum de rejeição.
+   Por isso, quando este app roda empacotado pelo Capacitor (ver
+   mobile/, rodandoNoApp()), a compra usa o RevenueCat (camada sobre o
+   Play Billing) em vez do link acima. Fora do app nativo (navegador
+   comum, PWA web), o Mercado Pago continua sendo usado normalmente —
+   a política da Play Store só rege o que é distribuído pela própria
+   Play Store, não a versão web do mesmo app.
+   RC_API_KEY_ANDROID: chave pública (não-secreta) do projeto RevenueCat,
+   específica de Android — pegue em app.revenuecat.com → Project
+   Settings → API Keys. Sem isso preenchido, a compra nativa fica
+   desabilitada e mostra uma mensagem em vez de travar. */
+var RC_API_KEY_ANDROID = ""; // ex.: "goog_XXXXXXXXXXXXXXXXXXXXXXXXXXX"
+var RC_ENTITLEMENT_ID = "apoiador"; // precisa bater com o Entitlement configurado no RevenueCat
+var rcConfigurado = false;
+/** Configura o SDK do RevenueCat uma vez por sessão, identificando o
+ *  comprador pelo PRÓPRIO e-mail do app (não um ID anônimo) — é isso
+ *  que permite o revenueCatWebhook (functions/) associar a compra à
+ *  conta certa sem nenhuma ambiguidade, ao contrário do que acontece
+ *  com o Mercado Pago (que só tem o e-mail informado no pagamento,
+ *  podendo divergir do e-mail de login). */
+async function configurarRevenueCatSeNecessario(){
+  if(rcConfigurado || !session.email) return capacitorPlugin("Purchases");
+  var purchases = capacitorPlugin("Purchases");
+  if(!purchases || !RC_API_KEY_ANDROID) return purchases;
+  try{
+    await purchases.configure({apiKey: RC_API_KEY_ANDROID, appUserID: session.email});
+    rcConfigurado = true;
+  }catch(e){ console.warn("Falha ao configurar o RevenueCat:", e.message); }
+  return purchases;
+}
+/** Dispara a compra pelo Google Play Billing. Devolve {ok, cancelado,
+ *  erro} em vez de lançar, pra quem chama não precisar de try/catch
+ *  duplicado — cancelar a compra (o jogador desistiu na hora) não é um
+ *  erro de verdade. */
+async function iniciarCompraPlayBilling(){
+  var purchases = await configurarRevenueCatSeNecessario();
+  if(!purchases) return {ok:false, cancelado:false, erro:"O RevenueCat não está configurado nesta build (ver mobile/README.md)."};
+  try{
+    var ofertas = await purchases.getOfferings();
+    var pacote = ofertas && ofertas.current && ofertas.current.availablePackages && ofertas.current.availablePackages[0];
+    if(!pacote) return {ok:false, cancelado:false, erro:"Nenhum plano disponível no momento — confira se o produto foi publicado no Play Console e vinculado no RevenueCat."};
+    var resultado = await purchases.purchasePackage({aPackage: pacote});
+    var liberado = resultado && resultado.customerInfo && resultado.customerInfo.entitlements &&
+      resultado.customerInfo.entitlements.active && resultado.customerInfo.entitlements.active[RC_ENTITLEMENT_ID];
+    return {ok: !!liberado, cancelado:false, erro: liberado ? null : "Compra concluída, aguardando confirmação — isso deve ser automático em poucos instantes."};
+  }catch(err){
+    var cancelado = err && (err.code==="1" || /cancel/i.test(err.message||""));
+    return {ok:false, cancelado: !!cancelado, erro: cancelado ? null : (err.message||"Não foi possível completar a compra.")};
+  }
+}
 var FEATURES_PAGAS = ["grupo_async","resolucao_automatica","historico_avancado","oficina","exportacao","arquivo_completo"]; // spec seção 51 — catálogo real ainda [a confirmar]
 /* Autorização de recurso pago (spec seção 53): gate único usado tanto
    pela UI (esconder/travar botão) quanto por qualquer checagem antes de
@@ -4633,18 +4687,30 @@ async function runGmTurn(advId, sceneId){
    checkPedido = inferCheckFromText(extracted.clean, character) || null;
  }
  await sSet("check:"+advId+":"+sceneId, checkPedido, true);
-/* O XP vinha sendo aplicado apenas dentro do bloco de fichas: quando o Mestre
-   mandava "xpConcedido" sem repetir a ficha, o ganho era descartado em
-   silêncio. Garantimos que toda ficha citada em xpConcedido seja processada,
-   mesmo sem entrada em "fichas". */
-      if(data.xpConcedido && Array.isArray(data.xpConcedido) && data.xpConcedido.length){
-        data.fichas = data.fichas || {};
-        data.xpConcedido.forEach(function(x){
-          if(!x || !x.email) return;
-          var em0 = normEmail(x.email);
-          if(!Object.prototype.hasOwnProperty.call(data.fichas, em0)) data.fichas[em0] = {};
-        });
-      }
+/* BUG CONFIRMADO (usuário relatou "ficha não atualiza com XP/itens"):
+   o loop de aplicação logo abaixo só processa `for(var em in data.fichas)`
+   — então qualquer ganho/perda declarado em xpConcedido, itensGanhos,
+   itensPerdidos, magiasAprendidas ou magiasPerdidas para um jogador que
+   a IA esqueceu de também citar em "fichas" (comum: ela só repete a
+   ficha de quem falou, não a de quem só recebeu um item) era
+   descartado em silêncio. Isto garante uma entrada em "fichas" (mesmo
+   vazia) para TODO e-mail citado em qualquer uma dessas listas — só
+   depois disso, mais abaixo, é que a atualização de fato acontece.
+   Cobre xpConcedido + usosConsumidos + descansoLongo (já cobertos
+   antes) e agora também itensGanhos/itensPerdidos/magiasAprendidas/
+   magiasPerdidas, que estavam de fora. */
+function garantirEntradasDeFichaParaListas(dataAlvo){
+ dataAlvo.fichas = dataAlvo.fichas || {};
+ [dataAlvo.xpConcedido, dataAlvo.itensGanhos, dataAlvo.itensPerdidos, dataAlvo.magiasAprendidas, dataAlvo.magiasPerdidas].forEach(function(lista){
+ (Array.isArray(lista) ? lista : []).forEach(function(x){
+ if(!x || !x.email) return;
+ var em = normEmail(x.email);
+ if(!Object.prototype.hasOwnProperty.call(dataAlvo.fichas, em)) dataAlvo.fichas[em] = {};
+ });
+ });
+ return dataAlvo.fichas;
+}
+      garantirEntradasDeFichaParaListas(data);
       if(data.usosConsumidos && Array.isArray(data.usosConsumidos) && data.usosConsumidos.length){
         data.fichas = data.fichas || {};
         data.usosConsumidos.forEach(function(u){
@@ -5953,6 +6019,11 @@ async function resolverCena(adv, ciclo, ordensDaCena, sceneId){
     catch(e){ console.warn("Falha ao registrar eventos do ciclo assíncrono:", e); }
   }
 
+  // BUG CONFIRMADO — mesma causa do modo síncrono (ver
+  // garantirEntradasDeFichaParaListas): sem isto, XP/item/magia
+  // declarados pra alguém que a IA não repetiu em "fichas" eram
+  // descartados em silêncio.
+  garantirEntradasDeFichaParaListas(data);
   if(data.fichas && typeof data.fichas==="object"){
     for(var em2 in data.fichas){
       if(!Object.prototype.hasOwnProperty.call(data.fichas, em2)) continue;
@@ -6668,6 +6739,39 @@ async function renderUpgradeBody(origem){
   if(motivo) html += '<p class="card-lede" style="margin-bottom:10px;">'+esc(motivo)+'</p>';
   if(PRECO_PLANO_TEXTO) html += '<p class="plan-price">'+esc(PRECO_PLANO_TEXTO)+'</p>';
   html += renderListaBeneficios();
+
+  if(rodandoNoApp()){
+    // Dentro do app da Play Store: só Google Play Billing — nada de
+    // link externo, nada de "avisar o administrador" (ver nota em
+    // RC_API_KEY_ANDROID acima sobre por que isso é obrigatório aqui).
+    if(!RC_API_KEY_ANDROID){
+      html += '<p class="modal-note">Assinatura ainda não configurada nesta build (falta a chave do RevenueCat — ver mobile/README.md).</p>';
+    } else {
+      html += '<div class="card-actions" style="margin-top:10px;"><button type="button" class="primary-btn" id="upgrade-play-billing" style="width:100%;">Assinar pelo Google Play</button></div>'+
+        '<p id="upgrade-play-billing-error" class="card-error hidden" style="margin-top:8px;"></p>';
+    }
+    body.innerHTML = html;
+    var btnPlay = el("upgrade-play-billing");
+    if(btnPlay) btnPlay.addEventListener("click", async function(){
+      var errBox = el("upgrade-play-billing-error"); errBox.classList.add("hidden");
+      btnPlay.disabled = true; var txt0 = btnPlay.textContent; btnPlay.textContent = "Abrindo o Google Play…";
+      var resultado = await iniciarCompraPlayBilling();
+      if(resultado.cancelado){ btnPlay.disabled=false; btnPlay.textContent=txt0; return; }
+      if(resultado.ok){
+        await carregarPlanoPago(true);
+        renderUpgradeBody(origem);
+        return;
+      }
+      if(resultado.erro){ errBox.textContent = resultado.erro; errBox.classList.remove("hidden"); }
+      btnPlay.disabled=false; btnPlay.textContent=txt0;
+      // O webhook do RevenueCat costuma confirmar em poucos segundos —
+      // tenta recarregar sozinho mais uma vez antes de deixar por conta
+      // do jogador clicar em algo.
+      setTimeout(async function(){ await carregarPlanoPago(true); if(temPlanoPago(session.email)) renderUpgradeBody(origem); }, 4000);
+    });
+    return;
+  }
+
   if(pendente){
     html += '<div class="plan-pending-badge">⏳ Recebemos seu aviso de pagamento em '+
       new Date(pedido.criadoEm).toLocaleDateString("pt-BR")+' — aguardando confirmação do administrador.</div>';
@@ -9769,6 +9873,28 @@ function rodandoInstalado(){
   return false;
 }
 
+/* Rodando dentro do app nativo empacotado pelo Capacitor (não confundir
+   com "instalado como PWA"/TWA acima — isso aqui é especificamente a
+   casca gerada pelo pacote mobile/, que embute o próprio Capacitor.js
+   e por isso tem window.Capacitor). Usado pra escolher: login nativo
+   (@capacitor-firebase/authentication) em vez de popup/redirect do
+   Firebase Web, e assinatura via Google Play Billing (RevenueCat) em
+   vez do link do Mercado Pago — a Play Store exige isso pra qualquer
+   recurso pago consumido dentro do próprio app (ver mobile/README.md). */
+function rodandoNoApp(){
+  try{ return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); }
+  catch(e){ return false; }
+}
+/** Acesso direto ao plugin nativo via window.Capacitor.Plugins — funciona
+ *  mesmo sem bundler/import, porque o bridge do Capacitor registra os
+ *  plugins nativos nesse objeto global independente de como o JS deles
+ *  foi carregado. É assim que este app (um único index.html, sem etapa
+ *  de build) consegue usar plugins do Capacitor. */
+function capacitorPlugin(nome){
+  try{ return (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins[nome]) || null; }
+  catch(e){ return null; }
+}
+
 /* Tudo que acontece depois de termos um usuário do Firebase Auth em
    mãos — usado tanto pelo caminho de popup quanto pelo de redirect
    (ver signInWithGoogle/checarResultadoDoRedirect), para não duplicar
@@ -9828,13 +9954,44 @@ async function signInWithGoogle(){
   var errBox = el("auth-error"); errBox.classList.add("hidden");
   var btn = el("google-signin");
   btn.disabled = true; btn.textContent = "Abrindo o Google…";
+
+  // Dentro do app nativo (Capacitor): login de verdade pelo Google
+  // (@capacitor-firebase/authentication), nada de popup/redirect do
+  // Firebase Web — mais confiável e é a experiência nativa esperada
+  // pelo usuário (a conta Google já logada no aparelho aparece direto).
+  if(rodandoNoApp()){
+    var pluginAuth = capacitorPlugin("FirebaseAuthentication");
+    if(!pluginAuth){
+      errBox.textContent = "O plugin de login nativo não está disponível nesta build. Confira mobile/README.md.";
+      errBox.classList.remove("hidden");
+      btn.disabled=false; btn.innerHTML = '<span class="g-logo">G</span> Entrar com a conta Google';
+      return;
+    }
+    try{
+      var resultadoNativo = await pluginAuth.signInWithGoogle();
+      var idToken = resultadoNativo && resultadoNativo.credential && resultadoNativo.credential.idToken;
+      if(!idToken) throw new Error("O Google não devolveu um token de identidade.");
+      var credential = fb.GoogleAuthProvider.credential(idToken);
+      var resNativo = await fb.signInWithCredential(fb.auth, credential);
+      await processarLoginGoogle(resNativo.user, btn);
+    }catch(err){
+      console.error(err);
+      errBox.textContent = "Não foi possível entrar com o Google: "+(err.message||err.code);
+      errBox.classList.remove("hidden");
+    }finally{
+      btn.disabled=false; btn.innerHTML = '<span class="g-logo">G</span> Entrar com a conta Google';
+    }
+    return;
+  }
+
   var provider = new fb.GoogleAuthProvider();
 
   if(rodandoInstalado()){
-    // Dentro de um app instalado/TWA, vai direto de redirect — popup
-    // aqui costuma falhar silenciosamente ou nem abrir. A página navega
-    // para o Google e volta; o resultado é tratado em
-    // checarResultadoDoRedirect(), chamado no boot().
+    // PWA instalado / TWA fora do app nativo (ex.: alguém "adicionou à
+    // tela inicial" pelo navegador em vez de instalar pela Play Store):
+    // vai de redirect — popup aqui costuma falhar silenciosamente ou
+    // nem abrir. A página navega para o Google e volta; o resultado é
+    // tratado em checarResultadoDoRedirect(), chamado no boot().
     try{ await fb.signInWithRedirect(fb.auth, provider); }
     catch(err){
       console.error(err);
