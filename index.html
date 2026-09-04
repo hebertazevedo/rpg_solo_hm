@@ -5791,7 +5791,16 @@ async function consultarMestreAssincrono(adv, ciclo){
   var data = null;
   try{ data = JSON.parse(slice.json); }catch(e){ throw new Error("Não consegui interpretar a resposta do Mestre."); }
   var brutos = (data && Array.isArray(data.pedidosDeAcao)) ? data.pedidosDeAcao : [];
-  var validEmails = (adv.members||[]).filter(function(m){ return m.status==="confirmado"; }).map(function(m){ return m.email; });
+  // BUG: aqui faltava normEmail() nos e-mails da aventura — o resto do
+  // app sempre normaliza antes de comparar (ver validMembers no turno
+  // síncrono), mas esta checagem comparava um e-mail normalizado
+  // (p.playerEmail já passa por normEmail logo abaixo) contra a lista
+  // "crua" de adv.members. Bastava um e-mail salvo com maiúscula em
+  // algum canto (convite antigo, digitação manual no Painel Admin) pra
+  // TODO pedido daquele jogador ser silenciosamente descartado — e como
+  // o Mestre já e´ orientado a criar poucos pedidos, o efeito prático
+  // era "o botão nunca retorna nada".
+  var validEmails = (adv.members||[]).filter(function(m){ return m.status==="confirmado"; }).map(function(m){ return normEmail(m.email); });
   var tiposValidos = ["obrigatorio","opcional","condicional","informativo"];
   var novos = [];
   brutos.forEach(function(p, i){
@@ -5813,7 +5822,13 @@ async function consultarMestreAssincrono(adv, ciclo){
   fresh.pendingDecisions = (fresh.pendingDecisions||[]).concat(novos);
   fresh.updatedAt = Date.now();
   await sSet(freshKey, fresh, true);
-  return fresh;
+  // Devolve também quantos pedidos novos saíram (e quantos são pra quem
+  // clicou) — sem isso, quando o Mestre legitimamente decide que
+  // nenhuma ordem precisa de esclarecimento (o próprio prompt pede pra
+  // ele ser econômico nisso), o botão "funcionava" mas não dava
+  // NENHUM sinal de que tinha rodado — parecia travado, mesmo não
+  // estando. Ver o handler de clique pra como isso é usado.
+  return {ciclo: fresh, novos: novos, novosParaMim: novos.filter(function(n){ return n.playerEmail===session.email; }).length};
 }
 
 /* Jogador responde uma decisão (marca a ordem como parcialmente definida
@@ -6625,8 +6640,20 @@ el("async-ask-gm").addEventListener("click", async function(){
   if(!session.apiKey){ errBox.textContent="Configure sua chave do Gemini para consultar o Mestre."; errBox.classList.remove("hidden"); return; }
   var btn = el("async-ask-gm"); btn.disabled = true; var textoOriginal = btn.textContent; btn.textContent = "Consultando…";
   try{
-    await consultarMestreAssincrono(currentAdv, asyncCurrentCycle);
+    var resultado = await consultarMestreAssincrono(currentAdv, asyncCurrentCycle);
     await refreshAsyncDesk();
+    // Sem isso, quando o Mestre legitimamente não achava nada a
+    // esclarecer (o próprio prompt pede economia) ou só gerava pedido
+    // pra OUTRO jogador (cada um só vê os próprios, por privacidade —
+    // ver renderAsyncDecisions), o botão terminava sem nenhum sinal
+    // visível, e parecia simplesmente não ter feito nada.
+    if(resultado.novos.length===0){
+      mostrarToastAsync("O Mestre revisou as ordens de hoje e não encontrou nenhuma decisão pendente por enquanto.");
+    } else if(resultado.novosParaMim===0){
+      mostrarToastAsync("O Mestre encontrou "+resultado.novos.length+" decisão(ões) pendente(s) — mas nenhuma pra você, pra outro(s) jogador(es) da aventura.");
+    } else {
+      mostrarToastAsync("O Mestre levantou "+resultado.novosParaMim+" decisão(ões) pra você — confira abaixo.");
+    }
   }catch(err){ errBox.textContent = err.message; errBox.classList.remove("hidden"); }
   finally{ btn.disabled=false; btn.textContent=textoOriginal; }
 });
