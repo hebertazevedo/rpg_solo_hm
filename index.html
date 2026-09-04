@@ -4609,6 +4609,38 @@ async function sendSceneMessage(text, opts){
  }finally{ loading=false; showTyping(false); updateSendUI(); }
 }
 
+/* BUG CONFIRMADO (usuário relatou "ficha não atualiza com XP/itens", e
+   depois "garantirEntradasDeFichaParaListas is not defined" no modo
+   assíncrono): esta função precisa ser chamada tanto pelo turno
+   síncrono (runGmTurn, abaixo) quanto pela resolução assíncrona
+   (resolverCena, bem mais adiante no arquivo) — por isso TEM que viver
+   no escopo global. A primeira versão desta correção foi declarada
+   *dentro* de runGmTurn por engano; funções declaradas dentro de outra
+   função só existem ali dentro (hoisting é por escopo, não é global),
+   então resolverCena() nunca enxergava essa função e quebrava com
+   "is not defined" toda vez que tentava resolver um dia.
+
+   O que ela resolve: o loop de aplicação de fichas só processa
+   `for(var em in data.fichas)` — então qualquer ganho/perda declarado
+   em xpConcedido, itensGanhos, itensPerdidos, magiasAprendidas ou
+   magiasPerdidas para um jogador que a IA esqueceu de também citar em
+   "fichas" (comum: ela só repete a ficha de quem falou, não a de quem
+   só recebeu um item) era descartado em silêncio. Isto garante uma
+   entrada em "fichas" (mesmo vazia) para TODO e-mail citado em
+   qualquer uma dessas listas — só depois disso é que a atualização de
+   fato acontece. */
+function garantirEntradasDeFichaParaListas(dataAlvo){
+ dataAlvo.fichas = dataAlvo.fichas || {};
+ [dataAlvo.xpConcedido, dataAlvo.itensGanhos, dataAlvo.itensPerdidos, dataAlvo.magiasAprendidas, dataAlvo.magiasPerdidas].forEach(function(lista){
+ (Array.isArray(lista) ? lista : []).forEach(function(x){
+ if(!x || !x.email) return;
+ var em = normEmail(x.email);
+ if(!Object.prototype.hasOwnProperty.call(dataAlvo.fichas, em)) dataAlvo.fichas[em] = {};
+ });
+ });
+ return dataAlvo.fichas;
+}
+
 async function runGmTurn(advId, sceneId){
  var lockKey = "gm-lock:"+advId+":"+sceneId;
  var got = await acquireLock(lockKey);
@@ -4687,29 +4719,6 @@ async function runGmTurn(advId, sceneId){
    checkPedido = inferCheckFromText(extracted.clean, character) || null;
  }
  await sSet("check:"+advId+":"+sceneId, checkPedido, true);
-/* BUG CONFIRMADO (usuário relatou "ficha não atualiza com XP/itens"):
-   o loop de aplicação logo abaixo só processa `for(var em in data.fichas)`
-   — então qualquer ganho/perda declarado em xpConcedido, itensGanhos,
-   itensPerdidos, magiasAprendidas ou magiasPerdidas para um jogador que
-   a IA esqueceu de também citar em "fichas" (comum: ela só repete a
-   ficha de quem falou, não a de quem só recebeu um item) era
-   descartado em silêncio. Isto garante uma entrada em "fichas" (mesmo
-   vazia) para TODO e-mail citado em qualquer uma dessas listas — só
-   depois disso, mais abaixo, é que a atualização de fato acontece.
-   Cobre xpConcedido + usosConsumidos + descansoLongo (já cobertos
-   antes) e agora também itensGanhos/itensPerdidos/magiasAprendidas/
-   magiasPerdidas, que estavam de fora. */
-function garantirEntradasDeFichaParaListas(dataAlvo){
- dataAlvo.fichas = dataAlvo.fichas || {};
- [dataAlvo.xpConcedido, dataAlvo.itensGanhos, dataAlvo.itensPerdidos, dataAlvo.magiasAprendidas, dataAlvo.magiasPerdidas].forEach(function(lista){
- (Array.isArray(lista) ? lista : []).forEach(function(x){
- if(!x || !x.email) return;
- var em = normEmail(x.email);
- if(!Object.prototype.hasOwnProperty.call(dataAlvo.fichas, em)) dataAlvo.fichas[em] = {};
- });
- });
- return dataAlvo.fichas;
-}
       garantirEntradasDeFichaParaListas(data);
       if(data.usosConsumidos && Array.isArray(data.usosConsumidos) && data.usosConsumidos.length){
         data.fichas = data.fichas || {};
