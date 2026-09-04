@@ -5629,6 +5629,30 @@ async function montarContextoOrdensParaMestre(adv, ciclo){
   return linhas.join("\n\n");
 }
 
+/* Formata o estadoNarrativo acumulado (objetivo, próximo passo, ganchos,
+   mistérios, NPCs, locais, facções, decisões já tomadas) em texto pro
+   Mestre ler antes de agir. Sem isso, cada dia recomeçava "esquecendo"
+   tudo o que a aventura já tinha estabelecido — o resumo do dia
+   anterior sozinho não é o mesmo que saber quem são os NPCs, que
+   lugares já foram descobertos e que decisões são irreversíveis. Usada
+   tanto na abertura do turno quanto na resolução das ordens e nas
+   decisões pendentes, pra o Mestre nunca contradizer o que a própria
+   aventura já registrou. */
+function formatarEstadoNarrativoParaPrompt(en){
+  if(!en || typeof en!=="object") return "";
+  var partes = [];
+  if(en.objetivo) partes.push("Objetivo atual: "+en.objetivo);
+  if(en.proximoPasso) partes.push("Próximo passo sugerido: "+en.proximoPasso);
+  if(en.missaoStatus && en.missaoStatus!=="ativa") partes.push("Status da missão: "+en.missaoStatus);
+  if(Array.isArray(en.ganchosAtivos) && en.ganchosAtivos.length) partes.push("Ganchos em aberto:\n- "+en.ganchosAtivos.join("\n- "));
+  if(Array.isArray(en.misterios) && en.misterios.length) partes.push("Mistérios ainda sem resposta:\n- "+en.misterios.join("\n- "));
+  if(Array.isArray(en.npcs) && en.npcs.length) partes.push("NPCs conhecidos:\n"+en.npcs.map(function(n){ return "- "+n.nome+" ("+(n.relacao||"relação desconhecida")+", "+(n.estado||"viva")+")"; }).join("\n"));
+  if(Array.isArray(en.locais) && en.locais.length) partes.push("Locais já descobertos:\n"+en.locais.map(function(l){ return "- "+l.nome+" ("+(l.situacao||"situação desconhecida")+")"; }).join("\n"));
+  if(Array.isArray(en.faccoes) && en.faccoes.length) partes.push("Facções conhecidas:\n"+en.faccoes.map(function(f){ return "- "+f.nome+" ("+(f.relacao||"relação desconhecida")+")"; }).join("\n"));
+  if(Array.isArray(en.decisoes) && en.decisoes.length) partes.push("Decisões importantes já tomadas pelo grupo (irreversíveis, nunca contradiga):\n- "+en.decisoes.slice(-10).join("\n- "));
+  return partes.join("\n\n");
+}
+
 /* Contextualização do Mestre no início de CADA turno (spec: a aventura
    e todo ciclo devem começar com a situação narrada + o que cada
    jogador deveria fazer) — chamada uma vez, na criação do ciclo (ver
@@ -5649,6 +5673,7 @@ async function gerarAberturaDeCiclo(adv, ciclo){
   }).join("\n");
 
   var ehPrimeiroCiclo = ciclo.cycleNumber===1;
+  var estadoTexto = formatarEstadoNarrativoParaPrompt(adv.estadoNarrativo);
   var contexto;
   if(ehPrimeiroCiclo){
     contexto = "Isto é o INÍCIO da aventura. Elenco:\n"+elencoTexto;
@@ -5659,13 +5684,14 @@ async function gerarAberturaDeCiclo(adv, ciclo){
       if(diarioAnterior) resumoAnterior = diarioAnterior.narrativeSummary || "";
     }
     contexto = "Um novo dia começa (dia "+ciclo.cycleNumber+"). Elenco:\n"+elencoTexto+
-      (resumoAnterior ? "\n\nResumo do dia anterior:\n"+resumoAnterior : "\n\n(sem resumo do dia anterior disponível — narre a situação atual do jeito que fizer sentido.)");
+      (resumoAnterior ? "\n\nResumo do dia anterior:\n"+resumoAnterior : "\n\n(sem resumo do dia anterior disponível — narre a situação atual do jeito que fizer sentido.)")+
+      (estadoTexto ? "\n\nEstado atual da aventura (nunca contradiga isto):\n"+estadoTexto : "");
   }
 
   var sistema = "Você é o Mestre de uma aventura de RPG de fantasia em GRUPO ASSÍNCRONO. "+
     (ehPrimeiroCiclo
       ? "Dê boas-vindas ao grupo e narre a abertura de um gancho de aventura, considerando as fichas de todos os personagens do elenco."
-      : "Recapitule brevemente onde a história parou, com base no resumo do dia anterior, e apresente a situação atual do dia de hoje.")+
+      : "Recapitule brevemente onde a história parou, com base no resumo do dia anterior e no estado atual da aventura (objetivo, NPCs, locais, facções, decisões já tomadas), e apresente a situação atual do dia de hoje — nunca contradiga nem esqueça o que já foi estabelecido.")+
     " Depois, para CADA jogador do elenco, escreva uma frase curta e objetiva do que ele deveria considerar decidir ou fazer hoje — isso NÃO é uma pergunta de múltipla escolha nem uma ordem obrigatória, é só um empurrão pra o jogador saber por onde começar a escrever a própria ordem do dia. Nunca resolva testes, dados ou consequências mecânicas aqui.\n\n"+
     "Responda SOMENTE com JSON, sem texto antes ou depois:\n"+
     '{"narrativa":"1 a 3 parágrafos","acoesEsperadas":[{"playerEmail":"...","texto":"o que esse jogador deveria considerar fazer hoje"}]}';
@@ -5691,7 +5717,9 @@ var ASYNC_GM_SYSTEM = "Você é o Mestre de uma aventura de RPG de fantasia em G
 async function consultarMestreAssincrono(adv, ciclo){
   var contexto = await montarContextoOrdensParaMestre(adv, ciclo);
   if(!contexto.trim()) throw new Error("Ainda não há nenhuma ordem enviada hoje para o Mestre analisar.");
-  var raw = await callGeminiRaw(ASYNC_GM_SYSTEM, [{role:"user", parts:[{text:"ORDENS DE HOJE:\n\n"+contexto}]}]);
+  var estadoTexto = formatarEstadoNarrativoParaPrompt(adv.estadoNarrativo);
+  var textoCompleto = "ORDENS DE HOJE:\n\n"+contexto+(estadoTexto ? "\n\nESTADO ATUAL DA AVENTURA (nunca contradiga isto):\n"+estadoTexto : "");
+  var raw = await callGeminiRaw(ASYNC_GM_SYSTEM, [{role:"user", parts:[{text:textoCompleto}]}]);
   var slice = sliceJsonObject(raw);
   if(!slice) throw new Error("O Mestre respondeu em um formato inesperado. Tente de novo.");
   var data = null;
@@ -5832,13 +5860,13 @@ function modificadorParaTeste(character, skillName){
   return (ab && character && character.atributos && typeof character.atributos[ab]==="number") ? character.atributos[ab] : 0;
 }
 
-var ASYNC_RESOLUTION_TESTS_SYSTEM = "Você é o Mestre de uma aventura de RPG assíncrona resolvendo o fechamento do dia para um grupo de jogadores. Você recebe as ordens finais (já travadas, algumas escolhidas automaticamente para quem não respondeu a tempo) de cada jogador nesta cena.\n\n"+
+var ASYNC_RESOLUTION_TESTS_SYSTEM = "Você é o Mestre de uma aventura de RPG assíncrona resolvendo o fechamento do dia para um grupo de jogadores. Você recebe as ordens finais (já travadas, algumas escolhidas automaticamente para quem não respondeu a tempo) de cada jogador nesta cena, e o estado atual da aventura acumulado até aqui (objetivo, NPCs, locais, facções, decisões já tomadas) — use-o para julgar se uma ação faz sentido dado o que já aconteceu, mas nunca o contradiga.\n\n"+
   "Sua única tarefa agora: 1) decidir a sequência narrativa mais coerente para resolver essas ações, considerando dependências e causalidade — se a ordem de um jogador depende do resultado da ordem de outro (ex.: um abre uma porta, outro entra por ela), o primeiro vem antes; ações independentes podem ficar em qualquer ordem; e 2) para cada jogador, declarar SE a ação dele exige um teste de perícia e, se exigir, qual perícia e qual CD (Classe de Dificuldade, um número, geralmente entre 10 e 30). NUNCA calcule, invente ou sugira um resultado de dado, grau de sucesso ou consequência — isso é feito por um motor separado depois desta chamada, com base na sua declaração.\n\n"+
   "Responda SOMENTE com JSON, sem texto antes ou depois, no formato exato:\n"+
   '{"ordem":["email-do-jogador-1","email-do-jogador-2"],"testes":[{"playerEmail":"...","pericia":"nome da perícia","cd":15,"motivo":"frase curta"}]}\n\n'+
   "Inclua em \"testes\" só quem realmente precisa de um teste para o que tentou fazer — ações claramente seguras ou automáticas (comprar algo, conversar sem risco, descansar) não precisam de teste nenhum.";
 
-var ASYNC_RESOLUTION_NARRATE_SYSTEM = "Você é o Mestre de uma aventura de RPG assíncrona narrando o resultado do fechamento do dia. Você já recebe os resultados MECÂNICOS prontos (rolagens, modificadores, grau de sucesso) — nunca os invente, corrija ou ignore; narre a partir deles.\n\n"+
+var ASYNC_RESOLUTION_NARRATE_SYSTEM = "Você é o Mestre de uma aventura de RPG assíncrona narrando o resultado do fechamento do dia. Você já recebe os resultados MECÂNICOS prontos (rolagens, modificadores, grau de sucesso) — nunca os invente, corrija ou ignore; narre a partir deles. Você também recebe o estado atual da aventura (objetivo, NPCs, locais, facções, decisões já tomadas) — a narrativa e o \"estadoNarrativo\" que você devolver precisam ser consistentes com isso, nunca contradizer ou esquecer o que já foi estabelecido.\n\n"+
   "Responda SOMENTE com um objeto JSON, sem texto antes ou depois, no formato exato:\n"+
   '{"narrativaColetiva":"o que o grupo como um todo percebeu do dia, em 1-2 parágrafos, sem revelar segredos privados de um jogador específico sem justificativa narrativa",'+
   '"resultadoColetivo":[{"playerEmail":"...","texto":"uma frase curta e pública sobre o que esse jogador fez, no estilo \'Ana descobriu uma passagem secreta\'"}],'+
@@ -5879,7 +5907,9 @@ async function resolverCena(adv, ciclo, ordensDaCena, sceneId){
   }));
 
   var contexto = montarOrdensParaResolucao(ordensDaCena, adv);
-  var raw1 = await callGeminiRaw(ASYNC_RESOLUTION_TESTS_SYSTEM, [{role:"user", parts:[{text:"ORDENS DA CENA (já travadas):\n\n"+contexto}]}]);
+  var estadoTexto = formatarEstadoNarrativoParaPrompt(adv.estadoNarrativo);
+  var blocoEstado = estadoTexto ? "\n\nESTADO ATUAL DA AVENTURA (nunca contradiga isto):\n"+estadoTexto : "";
+  var raw1 = await callGeminiRaw(ASYNC_RESOLUTION_TESTS_SYSTEM, [{role:"user", parts:[{text:"ORDENS DA CENA (já travadas):\n\n"+contexto+blocoEstado}]}]);
   var slice1 = sliceJsonObject(raw1);
   var decl = slice1 ? (JSON.parse(slice1.json)) : {ordem:[], testes:[]};
 
@@ -5905,7 +5935,7 @@ async function resolverCena(adv, ciclo, ordensDaCena, sceneId){
     }).join("\n") : "(nenhum teste necessário nesta cena)";
 
   var contexto2 = "ORDENS:\n"+contexto+"\n\nSEQUÊNCIA NARRATIVA DECIDIDA:\n"+((decl.ordem||[]).join(" → ")||"(livre)")+
-    "\n\nRESULTADOS MECÂNICOS JÁ CALCULADOS (use exatamente estes números):\n"+resumoTestes;
+    "\n\nRESULTADOS MECÂNICOS JÁ CALCULADOS (use exatamente estes números):\n"+resumoTestes+blocoEstado;
   var raw2 = await callGeminiRaw(ASYNC_RESOLUTION_NARRATE_SYSTEM, [{role:"user", parts:[{text:contexto2}]}]);
   var slice2 = sliceJsonObject(raw2);
   var data = slice2 ? JSON.parse(slice2.json) : {};
