@@ -5400,9 +5400,18 @@ async function getOrCreateCycle(adv){
   var key = cycleKey(advId, diaStr);
   var ciclo = await sGet(key, true);
   if(ciclo) return ciclo;
+  // IMPORTANTE: nunca calcula o número do ciclo a partir do parâmetro
+  // `adv` recebido — ele é o `currentAdv` que o cliente carregou quando
+  // entrou na tela, e pode estar velho (ex.: a aba ficou aberta de um
+  // dia pro outro, ou alguém navegou de volta ao hub e voltou sem que
+  // esse objeto em memória fosse resincronizado). Usar um valor
+  // desatualizado aqui é exatamente o que fazia cycleCount voltar pra 0
+  // e a aventura "reiniciar sempre no dia 1" — buscamos o mais recente
+  // do Firestore agora, na hora de decidir o número do próximo ciclo.
+  var advFresh = await sGet("adv:"+advId, true) || adv;
   var janela = limitesDoCiclo(diaStr);
-  var participantes = (adv.members||[]).filter(function(m){ return m.status==="confirmado"; }).map(function(m){ return m.email; });
-  var numero = (adv.cycleCount||0) + 1;
+  var participantes = (advFresh.members||[]).filter(function(m){ return m.status==="confirmado"; }).map(function(m){ return m.email; });
+  var numero = (advFresh.cycleCount||0) + 1;
   ciclo = {
     cycleId: diaStr, advId: advId, cycleNumber: numero, status:"collecting",
     openedAt: janela.openedAt, closesAt: janela.closesAt, resolvesAt: janela.resolvesAt,
@@ -5413,7 +5422,6 @@ async function getOrCreateCycle(adv){
   };
   var ok = await sSet(key, ciclo, true);
   if(ok){
-    var advFresh = await sGet("adv:"+advId, true) || adv;
     advFresh.currentCycleId = diaStr; advFresh.cycleCount = numero; advFresh.updatedAt = Date.now();
     await sSet("adv:"+advId, advFresh, true);
     // Todo turno (e a aventura, no ciclo nº1) começa com a contextualização
@@ -6096,6 +6104,13 @@ el("async-notify-btn").addEventListener("click", async function(){
 
 async function refreshAsyncDesk(){
   if(!currentAdv) return;
+  // Resincroniza com o Firestore toda vez — currentAdv é só um snapshot
+  // em memória de quando a tela foi aberta, e a aba pode ficar aberta
+  // por horas (inclusive atravessando a virada do dia). Sem isso,
+  // cycleCount/lastResolvedCycleId/estadoNarrativo/membros ficam presos
+  // no valor de quando a tela abriu — era exatamente isso que fazia a
+  // numeração do ciclo voltar pra 1 toda vez.
+  currentAdv = await sGet("adv:"+currentAdv.id, true) || currentAdv;
   var ciclo = await getOrCreateCycle(currentAdv);
   ciclo = await fecharCicloSeNecessario(currentAdv.id, ciclo);
   // Sem o scheduler real da Fase 6, é o próprio cliente que dispara a
