@@ -728,6 +728,26 @@ a{color:var(--arcane-bright);}
  .stat-strip{gap:6px;}
  .attr-grid{gap:5px;}
 }
+
+/* ===== Fase 10 — Mundo Compartilhado ===== */
+.mundo-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+.mundo-tab{background:transparent;border:1px solid var(--line-soft);color:var(--text-faint);
+  border-radius:999px;padding:7px 13px;font-size:12px;cursor:pointer;font-family:inherit;}
+.mundo-tab.on{border-color:var(--brass-bright);color:var(--text-hi);background:rgba(200,160,80,.10);}
+.canon-row{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line-soft);
+  border-radius:10px;padding:9px 11px;margin-bottom:7px;}
+.canon-row .cr-ico{font-size:17px;line-height:1.2;flex:0 0 auto;}
+.canon-row .cr-body{flex:1;min-width:0;}
+.canon-row .cr-body b{color:var(--text-hi);display:block;font-size:13px;}
+.canon-row .cr-body span{color:var(--text-faint);font-size:11.5px;display:block;line-height:1.45;}
+.canon-row .cr-acts{display:flex;gap:5px;flex-wrap:wrap;flex:0 0 auto;}
+.canon-row .cr-acts button{padding:5px 9px;font-size:11px;}
+.canon-tag{display:inline-block;border:1px solid var(--line-soft);border-radius:999px;
+  padding:1px 7px;font-size:10px;color:var(--text-faint);margin-right:4px;}
+.canon-tag.dom{border-color:var(--brass-bright);color:var(--brass-bright);}
+.canon-tag.bloq{border-color:#a05a5a;color:#d09090;}
+.mundo-empty{color:var(--text-faint);font-size:12.5px;padding:14px 4px;text-align:center;}
+.worldmode-opt small{display:block;color:var(--text-faint);font-size:11px;margin-top:2px;line-height:1.4;}
 </style>
 </head>
 <body>
@@ -800,6 +820,9 @@ a{color:var(--arcane-bright);}
  </button>
  <button class="icon-btn" id="hub-stats" title="Dados &amp; Estatísticas" aria-label="Dados e Estatísticas">
  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3v18h18"/><path d="M7 15l4-6 4 3 5-8"/></svg>
+ </button>
+ <button class="icon-btn" id="hub-world" title="Mundo compartilhado" aria-label="Mundo compartilhado">
+ <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18"/></svg>
  </button>
  <button class="icon-btn hidden" id="hub-event" title="Criar evento global" aria-label="Criar evento global">
  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 21V5a2 2 0 0 1 2-2h7l-1 3 1 3H6"/><path d="M4 21h6"/><path d="M17 3v18"/><path d="M14 21h6"/></svg>
@@ -1116,6 +1139,14 @@ a{color:var(--arcane-bright);}
  <label class="groupmode-opt" id="newadv-groupmode-async-opt"><input type="radio" name="newadv-groupmode" value="async"><div class="groupmode-opt-body"><b>Grupo assíncrono <span id="newadv-async-lock">🔒</span></b><span>Cada jogador envia suas ordens ao longo do dia; o Mestre resolve tudo automaticamente à meia-noite.</span></div></label>
  </div>
  </div>
+ <div class="field" id="newadv-worldmode-field">
+ <label>Mundo</label>
+ <div class="groupmode-options" id="newadv-worldmode-options"></div>
+ <div class="field hidden" id="newadv-world-pick-field" style="margin-top:8px;">
+ <label for="newadv-world-pick">Mundo do cânone</label>
+ <select id="newadv-world-pick" class="text-input"></select>
+ </div>
+ </div>
  <div class="field" id="newadv-invite-field">
  <label>Convidar por e-mail (precisa já ter cadastro no app)</label>
  <div id="newadv-invites"></div>
@@ -1176,6 +1207,37 @@ a{color:var(--arcane-bright);}
   </div>
 </div>
 
+<!-- MUNDO COMPARTILHADO (Fase 10) -->
+<div class="modal-overlay hidden" id="mundo-overlay">
+  <div class="modal-box" style="max-width:720px;">
+    <div class="modal-head"><h3 id="mundo-titulo">Mundo compartilhado</h3><button class="icon-btn" id="mundo-close" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button></div>
+    <div class="modal-body">
+      <div class="mundo-tabs" id="mundo-tabs"></div>
+      <div id="mundo-body"><p class="modal-note">Carregando…</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- CONSOLIDAR ELEMENTO DO CANONE (admin) -->
+<div class="modal-overlay hidden" id="canon-edit-overlay">
+  <div class="modal-box" style="max-width:520px;">
+    <div class="modal-head"><h3 id="canon-edit-titulo">Fixar no cânone</h3><button class="icon-btn" id="canon-edit-close" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg></button></div>
+    <div class="modal-body">
+      <div class="field"><label for="canon-edit-nome">Nome</label><input id="canon-edit-nome" class="text-input"></div>
+      <div class="field"><label for="canon-edit-tipo">Tipo</label><select id="canon-edit-tipo" class="text-input"></select></div>
+      <div class="field"><label for="canon-edit-pai">Pertence a (opcional)</label><select id="canon-edit-pai" class="text-input"></select></div>
+      <div class="field"><label for="canon-edit-resumo">Resumo (1 linha — vai no prompt do Mestre)</label><textarea id="canon-edit-resumo" class="text-input" rows="2"></textarea></div>
+      <div class="field"><label for="canon-edit-desc">Descrição completa (não vai no prompt)</label><textarea id="canon-edit-desc" class="text-input" rows="4"></textarea></div>
+      <div class="input-with-btn" style="margin-top:4px;">
+        <button type="button" class="ghost-btn" id="canon-edit-ia" style="flex:1;">✨ Consolidar com a IA</button>
+      </div>
+      <p class="hint" id="canon-edit-status"></p>
+      <p id="canon-edit-error" class="card-error hidden"></p>
+    </div>
+    <div class="modal-actions"><button class="secondary-btn" id="canon-edit-cancel">Cancelar</button><button class="primary-btn" id="canon-edit-save">Fixar no cânone</button></div>
+  </div>
+</div>
+
 <!-- COMPANHEIROS DE IA (Fase 5, aventura solo) -->
 <div class="modal-overlay hidden" id="companions-overlay">
   <div class="modal-box" style="max-width:460px;">
@@ -1189,6 +1251,14 @@ a{color:var(--arcane-bright);}
         <button type="button" class="companions-opt" data-choice="com">
           <span class="co-glyph">🤝</span><span class="co-label">Com companheiros</span><span class="co-sub">O Mestre cria e interpreta aliados de IA.</span>
         </button>
+      </div>
+      <div class="field" id="companions-worldmode-field" style="margin-top:14px;">
+        <label>Mundo</label>
+        <div class="groupmode-options" id="companions-worldmode-options"></div>
+        <div class="field hidden" id="companions-world-pick-field" style="margin-top:8px;">
+          <label for="companions-world-pick">Mundo do cânone</label>
+          <select id="companions-world-pick" class="text-input"></select>
+        </div>
       </div>
       <div class="field hidden" id="companions-desc-field" style="margin-top:12px;">
         <label for="companions-desc">Descreva o grupo (opcional)</label>
@@ -2442,6 +2512,653 @@ var NARRATIVIDADE_NIVEIS = {
   media: "RITMO E SURPRESA (intensidade: média — ajustável no Painel Admin): evite que a aventura vire uma sequência previsível de \"descreva → jogador decide → resultado\". Varie o ritmo com moderação — alterne cenas de ação com momentos de respiro, tensão com alívio. A cada poucas respostas (não em toda cena), quando fizer sentido, introduza algo que quebre levemente a expectativa do jogador: um detalhe que recontextualiza algo já visto, uma consequência inesperada de uma escolha anterior, ou uma mudança de tom. Nunca force uma reviravolta artificial — ela precisa nascer de algo já plantado na história, nunca contradizer o que já foi estabelecido.\n\n",
   alta: "RITMO E SURPRESA (intensidade: alta — ajustável no Painel Admin): esta história NÃO pode ficar previsível. Alterne deliberadamente o ritmo entre cenas — ação, tensão, alívio, mistério, urgência — sem deixar dois trechos seguidos no mesmo tom. Busque ativamente reviravoltas: um aliado que não é o que parece, uma pista que muda o significado do que já aconteceu, uma consequência tardia de uma decisão antiga, um segredo revelado no pior momento possível. Force decisões morais difíceis quando a cena permitir. Mesmo assim, toda reviravolta precisa ser coerente com o que já foi narrado — surpreenda o jogador sem nunca trair a lógica interna da história ou contradizer um fato já estabelecido.\n\n"
 };
+
+/* =========================================================
+   FASE 10 — MUNDO COMPARTILHADO (CÂNONE)
+
+   Ideia: cada aventura pode CONSUMIR o mundo compartilhado
+   (cânone já fixado pelo administrador) e/ou ALIMENTÁ-LO com
+   novos elementos. A IA apenas PROPÕE elementos e reivindica
+   conquistas; nada entra no cânone sem curadoria do admin, e
+   nenhum domínio é concedido sem o motor determinístico
+   conferir o nível do personagem (RF-045).
+
+   Chaves no kv (compartilhadas):
+     canon-index        -> {v, elementos:[...], atualizadoEm}
+     canon-entry:<id>   -> descrição longa de um elemento
+     canon-pend         -> {itens:[...]} propostas aguardando curadoria
+     canon-log          -> últimas decisões de domínio (auditoria)
+   ========================================================= */
+var CANON_TIPOS = {
+  npc:    {label:"NPC",    plural:"NPCs",     icone:"🧑", ordem:1},
+  faccao: {label:"Facção", plural:"Facções",  icone:"⚔️", ordem:2},
+  local:  {label:"Local",  plural:"Locais",   icone:"📍", ordem:3},
+  cidade: {label:"Cidade", plural:"Cidades",  icone:"🏰", ordem:4},
+  regiao: {label:"Região", plural:"Regiões",  icone:"🗺️", ordem:5},
+  pais:   {label:"País",   plural:"Países",   icone:"🏳️", ordem:6},
+  mundo:  {label:"Mundo",  plural:"Mundos",   icone:"🌍", ordem:7}
+};
+/* Trava de progressão pedida pelo dono do app (set/2026):
+   abaixo de 10 não controla cidade, abaixo de 20 não controla
+   região, abaixo de 30 não domina país, abaixo de 50 não domina
+   mundo. Editável no painel do mundo (aba "Regras"). */
+var NIVEL_DOMINIO_PADRAO = { npc:1, faccao:1, local:1, cidade:10, regiao:20, pais:30, mundo:50 };
+var MODOS_MUNDO = {
+  compartilhado: {
+    label: "Mundo compartilhado",
+    curto: "Jogar no cânone já existente",
+    desc: "A aventura acontece no mundo já consolidado. O Mestre usa os elementos fixados e não inventa novos lugares, povos ou potências permanentes.",
+    usaCanon: true, alimenta: false
+  },
+  hibrido: {
+    label: "Compartilhado + criação",
+    curto: "Usar o cânone e ampliá-lo",
+    desc: "Parte do cânone já fixado, mas o Mestre pode criar coisas novas — que entram na fila de curadoria e podem virar cânone para todo mundo.",
+    usaCanon: true, alimenta: true
+  },
+  novo: {
+    label: "Mundo novo",
+    curto: "Criar tudo do zero",
+    desc: "A aventura ignora o cânone e cria um mundo próprio. O que surgir aqui também entra na fila de curadoria, e pode ser fixado depois.",
+    usaCanon: false, alimenta: true
+  }
+};
+var CANON_MAX_PROMPT = 60;      // elementos enviados ao Mestre por vez
+var CANON_MAX_PENDENTES = 300;  // teto da fila de curadoria
+
+var canonIndexCache = null, canonIndexCacheAt = 0;
+var CANON_CACHE_TTL = 60*1000;
+
+function canonNovoId(tipo){
+  return "cn_"+(tipo||"el")+"_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,7);
+}
+function canonTipoValido(t){ return CANON_TIPOS[t] ? t : null; }
+function canonChave(tipo, nome){ return (tipo||"")+"|"+normaliza(nome||""); }
+
+function obterNiveisDominio(){
+  var cfg = (adminConfig && adminConfig.niveisDominio) || {};
+  var out = {};
+  Object.keys(NIVEL_DOMINIO_PADRAO).forEach(function(t){
+    var v = parseInt(cfg[t], 10);
+    out[t] = (isFinite(v) && v>0) ? v : NIVEL_DOMINIO_PADRAO[t];
+  });
+  return out;
+}
+
+/* ---- leitura ---- */
+async function carregarCanonIndex(forcar){
+  if(!forcar && canonIndexCache && (Date.now()-canonIndexCacheAt) < CANON_CACHE_TTL) return canonIndexCache;
+  var idx = await sGet("canon-index", true);
+  if(!idx || !Array.isArray(idx.elementos)) idx = {v:1, elementos:[], atualizadoEm:0};
+  canonIndexCache = idx; canonIndexCacheAt = Date.now();
+  return idx;
+}
+async function carregarCanonPendentes(){
+  var p = await sGet("canon-pend", true);
+  if(!p || !Array.isArray(p.itens)) p = {itens:[], atualizadoEm:0};
+  return p;
+}
+
+/* ---- escrita com trava (mesmo padrão de acquireLock do resto do app) ---- */
+async function atualizarCanonIndex(mutador){
+  var lockKey = "canon-lock:index";
+  var got = await acquireLock(lockKey);
+  if(!got) throw new Error("O cânone está sendo atualizado por outra pessoa agora. Tente de novo em alguns segundos.");
+  try{
+    var idx = await sGet("canon-index", true);
+    if(!idx || !Array.isArray(idx.elementos)) idx = {v:1, elementos:[], atualizadoEm:0};
+    var r = mutador(idx);
+    idx.atualizadoEm = Date.now();
+    await sSet("canon-index", idx, true);
+    canonIndexCache = idx; canonIndexCacheAt = Date.now();
+    return r === undefined ? idx : r;
+  } finally { await releaseLock(lockKey); }
+}
+async function atualizarCanonPendentes(mutador){
+  var lockKey = "canon-lock:pend";
+  var got = await acquireLock(lockKey);
+  if(!got) return null; // fila de curadoria não é crítica: se travou, tenta no próximo turno
+  try{
+    var p = await sGet("canon-pend", true);
+    if(!p || !Array.isArray(p.itens)) p = {itens:[], atualizadoEm:0};
+    var r = mutador(p);
+    if(p.itens.length > CANON_MAX_PENDENTES) p.itens = p.itens.slice(-CANON_MAX_PENDENTES);
+    p.atualizadoEm = Date.now();
+    await sSet("canon-pend", p, true);
+    return r === undefined ? p : r;
+  } finally { await releaseLock(lockKey); }
+}
+
+/* ---- modo de mundo da aventura ---- */
+function modoMundoDe(adv){
+  var m = adv && adv.mundo && adv.mundo.modo;
+  return MODOS_MUNDO[m] ? m : "hibrido";
+}
+function advUsaCanon(adv){ return MODOS_MUNDO[modoMundoDe(adv)].usaCanon; }
+function advAlimentaCanon(adv){
+  if(adv && adv.mundo && adv.mundo.alimenta===false) return false;
+  return MODOS_MUNDO[modoMundoDe(adv)].alimenta;
+}
+
+/* Elementos visíveis para uma aventura: se ela está amarrada a um mundo
+   do cânone, só o que descende daquele mundo (mais o que ainda não foi
+   pendurado em mundo nenhum). Sem mundo escolhido, o cânone inteiro. */
+function elementosDoMundo(idx, mundoId){
+  var todos = (idx && idx.elementos) || [];
+  if(!mundoId) return todos;
+  var porId = {}; todos.forEach(function(e){ porId[e.id] = e; });
+  function raizDe(e){
+    var atual = e, guarda = 0;
+    while(atual && atual.paiId && porId[atual.paiId] && guarda++ < 12) atual = porId[atual.paiId];
+    return atual;
+  }
+  return todos.filter(function(e){
+    if(e.id===mundoId) return true;
+    var raiz = raizDe(e);
+    if(raiz && raiz.id===mundoId) return true;
+    return !(raiz && raiz.tipo==="mundo"); // elemento solto: continua visível
+  });
+}
+
+function canonLinhaPrompt(el2, porId){
+  var t = CANON_TIPOS[el2.tipo] || CANON_TIPOS.local;
+  var pai = (el2.paiId && porId[el2.paiId]) ? (" em "+porId[el2.paiId].nome) : "";
+  var dom = el2.dominio ? (" — sob domínio de "+(el2.dominio.personagem || el2.dominio.email)) : "";
+  return "- ["+t.label+"] "+el2.nome+pai+dom+(el2.resumo ? ": "+String(el2.resumo).slice(0,180) : "");
+}
+
+/* Bloco que entra no prompt do Mestre. Síncrono de propósito: lê o cache
+   já carregado por carregarCanonIndex() antes da chamada à IA. */
+function blocoMundoParaPrompt(adv){
+  var modo = modoMundoDe(adv);
+  var cfgModo = MODOS_MUNDO[modo];
+  var gates = obterNiveisDominio();
+  var idx = canonIndexCache || {elementos:[]};
+  var out = ["\n\nMUNDO COMPARTILHADO — modo desta aventura: "+cfgModo.label.toUpperCase()+".\n"+cfgModo.desc+"\n"];
+
+  if(cfgModo.usaCanon){
+    var lista = elementosDoMundo(idx, adv && adv.mundo && adv.mundo.mundoId);
+    var porId = {}; (idx.elementos||[]).forEach(function(e){ porId[e.id]=e; });
+    if(lista.length){
+      var ordenada = lista.slice().sort(function(a,b){
+        return ((CANON_TIPOS[b.tipo]||{ordem:0}).ordem||0) - ((CANON_TIPOS[a.tipo]||{ordem:0}).ordem||0);
+      }).slice(0, CANON_MAX_PROMPT);
+      out.push("CÂNONE JÁ FIXADO (fonte da verdade — nunca renomeie, nunca contradiga, nunca destrua ou mate um destes elementos sem que a cena justifique claramente):");
+      out.push(ordenada.map(function(e){ return canonLinhaPrompt(e, porId); }).join("\n"));
+      out.push("");
+    } else {
+      out.push("O cânone ainda está vazio: nada foi fixado até agora. Trate o que você criar como candidato a fundar este mundo.\n");
+    }
+    if(modo==="compartilhado"){
+      out.push("REGRA DO MODO COMPARTILHADO: não invente cidades, regiões, países, mundos, facções nem NPCs recorrentes fora da lista acima. Figurantes descartáveis de uma cena (um guarda sem nome, um taverneiro de passagem) são permitidos; qualquer coisa destinada a durar precisa já estar no cânone.\n");
+    }
+  } else {
+    out.push("Esta aventura NÃO usa o cânone existente: construa o cenário livremente do zero.\n");
+  }
+
+  if(advAlimentaCanon(adv)){
+    out.push("PROPOSTAS PARA O CÂNONE: sempre que você estabelecer na narrativa um elemento com cara de permanente (um NPC recorrente, uma facção, um local marcante, uma cidade, uma região, um país ou um mundo), liste-o em \"mundoPropostas\". Isso NÃO o torna oficial — um curador humano decide depois. Liste apenas o que surgiu ou mudou NESTE turno, no máximo 4 por turno, e nunca repita algo que já esteja no cânone acima.\n");
+  } else {
+    out.push("Esta aventura não alimenta o cânone: devolva \"mundoPropostas\": [].\n");
+  }
+
+  out.push("CONQUISTA E DOMÍNIO: um personagem pode passar a controlar um elemento do cânone (uma cidade, uma região, um país, um mundo, uma facção). Quando a narrativa levar a isso, registre a pretensão em \"dominiosReivindicados\" e narre o desfecho como EM ABERTO — jamais afirme que o personagem já governa o lugar. Quem decide é o aplicativo, que confere o nível do personagem e responde no turno seguinte. Limites de nível em vigor: cidade a partir do nível "+gates.cidade+", região a partir do "+gates.regiao+", país a partir do "+gates.pais+", mundo a partir do "+gates.mundo+". Se um personagem abaixo do limite tentar, narre a tentativa e o obstáculo — nunca a vitória.\n");
+
+  out.push("CAMPOS ADICIONAIS DO BLOCO JSON (acrescente ao MESMO objeto do bloco oculto, junto com os campos já descritos):\n"+
+  ' "mundoPropostas": [{"tipo": "npc"|"faccao"|"local"|"cidade"|"regiao"|"pais"|"mundo", "nome": string, "resumo": string (1 frase), "paiNome": string|null}],\n'+
+  ' "dominiosReivindicados": [{"email": string, "nome": string (nome exato do elemento), "tipoAcao": "controle"|"dominio"}],\n'+
+  ' "acoesDeGuerra": [{"email": string, "nome": string (elemento em disputa), "tipo": "ataque"|"defesa"}]\n'+
+  "Arrays vazios quando não houver nada — é o caso da maioria dos turnos.");
+
+  return out.join("\n");
+}
+
+/* Versão em texto puro para os prompts assíncronos (que não passam por
+   advBody/buildAdvSystemPrompt). */
+function blocoMundoResumidoParaPrompt(adv){
+  if(!advUsaCanon(adv)) return "";
+  var idx = canonIndexCache || {elementos:[]};
+  var lista = elementosDoMundo(idx, adv && adv.mundo && adv.mundo.mundoId);
+  if(!lista.length) return "";
+  var porId = {}; (idx.elementos||[]).forEach(function(e){ porId[e.id]=e; });
+  return "\n\nCÂNONE DO MUNDO COMPARTILHADO (nunca contradiga):\n"+
+    lista.slice(0, CANON_MAX_PROMPT).map(function(e){ return canonLinhaPrompt(e, porId); }).join("\n");
+}
+
+/* ---------------------------------------------------------------
+   MOTOR: colhe propostas e julga reivindicações de domínio.
+   Global de propósito (ver engineering-principles: funções usadas
+   pelos caminhos síncrono E assíncrono não podem ficar aninhadas).
+   --------------------------------------------------------------- */
+function coletarPropostasDoTurno(adv, data){
+  var props = [];
+  var vistos = {};
+  function push(tipo, nome, resumo, paiNome){
+    tipo = canonTipoValido(tipo) || "local";
+    nome = String(nome||"").trim().slice(0,80);
+    if(!nome) return;
+    // Dedupe pelo NOME, não por tipo+nome: a mesma "Vale do Corvo" chega
+    // como cidade em mundoPropostas e como local em estadoNarrativo, e o
+    // curador não deve ver o mesmo lugar duas vezes. Vence quem chegou
+    // primeiro — e mundoPropostas (a declaração explícita) vem antes.
+    var k = normaliza(nome);
+    if(vistos[k]) return;
+    vistos[k] = true;
+    props.push({tipo:tipo, nome:nome, resumo:String(resumo||"").trim().slice(0,240), paiNome:(paiNome?String(paiNome).trim().slice(0,80):null)});
+  }
+  if(Array.isArray(data.mundoPropostas)){
+    data.mundoPropostas.slice(0,6).forEach(function(p){
+      if(p && p.nome) push(p.tipo, p.nome, p.resumo, p.paiNome);
+    });
+  }
+  // Rede de segurança: mesmo que a IA esqueça "mundoPropostas", o estado
+  // narrativo já traz NPCs, locais e facções desta aventura.
+  var en = data.estadoNarrativo;
+  if(en && typeof en==="object"){
+    (Array.isArray(en.npcs)?en.npcs:[]).slice(0,8).forEach(function(n){ if(n&&n.nome) push("npc", n.nome, "NPC conhecido nesta aventura ("+(n.relacao||"desconhecida")+")", null); });
+    (Array.isArray(en.locais)?en.locais:[]).slice(0,8).forEach(function(l){ if(l&&l.nome) push("local", l.nome, "Local descoberto nesta aventura ("+(l.situacao||"desconhecida")+")", null); });
+    (Array.isArray(en.faccoes)?en.faccoes:[]).slice(0,6).forEach(function(f){ if(f&&f.nome) push("faccao", f.nome, "Facção conhecida nesta aventura ("+(f.relacao||"desconhecida")+")", null); });
+  }
+  return props;
+}
+
+async function registrarPropostasDeCanon(adv, propostas){
+  if(!propostas.length) return 0;
+  var idx = await carregarCanonIndex();
+  var jaFixado = {}, jaFixadoNome = {};
+  (idx.elementos||[]).forEach(function(e){ jaFixado[canonChave(e.tipo, e.nome)] = true; jaFixadoNome[normaliza(e.nome)] = true; });
+  var novos = 0;
+  await atualizarCanonPendentes(function(p){
+    var jaPend = {};
+    p.itens.forEach(function(i){ jaPend[normaliza(i.nome)] = true; });
+    propostas.forEach(function(pr){
+      var k = normaliza(pr.nome);
+      if(jaFixado[canonChave(pr.tipo, pr.nome)] || jaFixadoNome[k] || jaPend[k]) return;
+      jaPend[k] = true; novos++;
+      p.itens.push({
+        id: canonNovoId("pd"),
+        tipo: pr.tipo, nome: pr.nome, resumo: pr.resumo, paiNome: pr.paiNome,
+        origemAdvId: adv.id, origemAdvNome: adv.name || "",
+        origemModo: modoMundoDe(adv),
+        propostoPor: (adv.hostEmail || session.email || ""),
+        propostoEm: Date.now(),
+        status: "pendente"
+      });
+    });
+  });
+  return novos;
+}
+
+async function validarReivindicacoesDominio(adv, lista){
+  var avisos = [], eventos = [];
+  if(!Array.isArray(lista) || !lista.length) return {avisos:avisos, eventos:eventos};
+  var idx = await carregarCanonIndex(true);
+  var gates = obterNiveisDominio();
+  var membros = (adv.members||[]).filter(function(m){ return m.status==="confirmado"; });
+  var emailsOk = {}; membros.forEach(function(m){ emailsOk[m.email] = m; });
+  if(!membros.length && session.email) emailsOk[session.email] = {email:session.email, name:session.name};
+
+  for(var i=0; i<Math.min(lista.length, 4); i++){
+    var r = lista[i] || {};
+    var email = normEmail(r.email||"");
+    var membro = emailsOk[email];
+    if(!membro) continue;
+    var nome = String(r.nome||"").trim();
+    if(!nome) continue;
+    var acao = (r.tipoAcao==="dominio") ? "dominar" : "controlar";
+
+    var alvo = (idx.elementos||[]).filter(function(e){ return normaliza(e.nome)===normaliza(nome); })[0];
+    if(!alvo){
+      avisos.push("⚖️ "+nome+" ainda não faz parte do cânone do mundo compartilhado. A conquista ficou registrada como proposta e só passa a valer depois que o administrador fixar o elemento.");
+      continue;
+    }
+    var tipoLabel = (CANON_TIPOS[alvo.tipo]||CANON_TIPOS.local).label.toLowerCase();
+    var minimo = gates[alvo.tipo] || 1;
+    var ficha = await sGet("character:"+email, true);
+    var nivel = (ficha && ficha.nivel) || 1;
+
+    if(nivel < minimo){
+      avisos.push("⚖️ "+(membro.name||email)+" (nível "+nivel+") ainda não pode "+acao+" "+tipoLabel+" "+alvo.nome+": é preciso nível "+minimo+" ou mais. A conquista NÃO foi registrada — narre o obstáculo, não a vitória.");
+      eventos.push({tipo:"DOMINIO_NEGADO", nome:alvo.nome, email:email});
+      continue;
+    }
+    if(alvo.dominio && normEmail(alvo.dominio.email)===email) continue; // já é dele
+    if(alvo.dominio){
+      // Fase 11: território com dono não troca de mãos por declaração — abre guerra.
+      try{
+        avisos.push(await abrirGuerra(adv, alvo, membro, ficha));
+        eventos.push({tipo:"GUERRA_DECLARADA", nome:alvo.nome, email:email});
+      }catch(err){
+        console.warn("Falha ao abrir guerra:", err);
+        avisos.push("⚖️ Não foi possível abrir a guerra por "+alvo.nome+" agora. Tente de novo em alguns instantes.");
+      }
+      continue;
+    }
+
+    var registro = {
+      email: email,
+      nome: (membro.name||email),
+      personagem: (ficha && ficha.nome) || membro.name || email,
+      nivel: nivel,
+      desde: Date.now(),
+      advId: adv.id
+    };
+    var alvoId = alvo.id;
+    try{
+      await atualizarCanonIndex(function(ix){
+        var alvo2 = (ix.elementos||[]).filter(function(e){ return e.id===alvoId; })[0];
+        if(alvo2 && !alvo2.dominio) alvo2.dominio = registro;
+      });
+      avisos.push("👑 "+registro.personagem+" passa a "+acao+" "+tipoLabel+" "+alvo.nome+" — domínio registrado no mundo compartilhado.");
+      eventos.push({tipo:"DOMINIO_CONCEDIDO", nome:alvo.nome, email:email});
+      try{
+        var log = await sGet("canon-log", true) || [];
+        log.push({em:Date.now(), email:email, elemento:alvo.nome, tipo:alvo.tipo, nivel:nivel, advId:adv.id});
+        await sSet("canon-log", log.slice(-200), true);
+      }catch(e){ /* auditoria é acessório */ }
+    }catch(err){
+      console.warn("Falha ao registrar domínio:", err);
+    }
+  }
+  return {avisos:avisos, eventos:eventos};
+}
+
+/* Ponto único chamado pelos dois motores (síncrono e assíncrono). */
+async function processarMundoCompartilhado(adv, data){
+  var res = {avisos:[], eventos:[], propostas:0};
+  if(!adv || !data) return res;
+  try{
+    if(advAlimentaCanon(adv)){
+      res.propostas = await registrarPropostasDeCanon(adv, coletarPropostasDoTurno(adv, data)) || 0;
+    }
+    // Fase 11, na ordem que importa: primeiro fecha o que já venceu (para
+    // que uma reivindicação nova não esbarre numa guerra fantasma), depois
+    // conta as campanhas da cena, e só então julga novas pretensões.
+    var venc = await resolverGuerrasVencidas();
+    var camp = await registrarAcoesDeGuerra(adv, data.acoesDeGuerra);
+    var jul = await validarReivindicacoesDominio(adv, data.dominiosReivindicados);
+    res.avisos = venc.avisos.concat(camp.avisos, jul.avisos);
+    res.eventos = venc.eventos.concat(camp.eventos, jul.eventos);
+  }catch(err){
+    console.warn("Mundo compartilhado: falha ao processar o turno —", err);
+  }
+  return res;
+}
+
+
+/* =========================================================
+   FASE 11 — CONQUISTA POR GUERRA
+
+   Um elemento do cânone que já tem dono não pode mais ser
+   simplesmente reivindicado: abre-se uma GUERRA entre o
+   pretendente e o atual detentor. A guerra corre em campanhas
+   (ações de guerra narradas nas aventuras dos dois lados, cada
+   uma resolvida com uma rolagem determinística) e é decidida
+   em melhor de três confrontos, também rolados pelo motor.
+
+   RF-045 vale integralmente: a IA só DECLARA que houve uma ação
+   de guerra na cena; quem rola, soma e decide é o aplicativo.
+   ========================================================= */
+var GUERRA_PRAZO_MS = 72*60*60*1000;      // janela de campanha antes do confronto final
+var GUERRA_MAX_CAMPANHAS = 3;             // teto de campanhas por lado
+var GUERRA_COOLDOWN_MS = 7*24*60*60*1000; // trégua obrigatória depois de uma guerra
+var GUERRA_CD_CAMPANHA = 12;              // CD base de uma ação de guerra
+var GUERRA_MAX_HISTORICO = 40;
+/* Vantagem de quem já detém o território: quanto maior o escopo,
+   mais difícil é arrancá-lo de quem o governa. */
+var FORTIFICACAO = { npc:0, faccao:1, local:1, cidade:2, regiao:3, pais:4, mundo:5 };
+
+function modGuerra(nivel){ return Math.floor((nivel||1)/2); }
+function forcaDeGuerra(lado, fortificacao){
+  return modGuerra(lado.nivel) + (lado.campanhas||0)*2 + (fortificacao||0);
+}
+
+async function carregarGuerras(){
+  var g = await sGet("guerras", true);
+  if(!g || !Array.isArray(g.itens)) g = {itens:[], atualizadoEm:0};
+  return g;
+}
+async function atualizarGuerras(mutador){
+  var lockKey = "canon-lock:guerras";
+  var got = await acquireLock(lockKey);
+  if(!got) throw new Error("As guerras estão sendo atualizadas por outra pessoa agora. Tente de novo em alguns segundos.");
+  try{
+    var g = await sGet("guerras", true);
+    if(!g || !Array.isArray(g.itens)) g = {itens:[], atualizadoEm:0};
+    var r = mutador(g);
+    g.itens = g.itens.slice(-GUERRA_MAX_HISTORICO);
+    g.atualizadoEm = Date.now();
+    await sSet("guerras", g, true);
+    return r === undefined ? g : r;
+  } finally { await releaseLock(lockKey); }
+}
+function guerrasAbertas(g){ return (g.itens||[]).filter(function(x){ return x.status==="aberta"; }); }
+function guerraDoElemento(g, elementoId){
+  return guerrasAbertas(g).filter(function(x){ return x.elementoId===elementoId; })[0] || null;
+}
+function ladoDaGuerra(guerra, email){
+  email = normEmail(email);
+  if(normEmail(guerra.atacante.email)===email) return "atacante";
+  if(normEmail(guerra.defensor.email)===email) return "defensor";
+  return null;
+}
+
+/* Abre a guerra. Devolve o aviso que o jogador vê na cena — ou a recusa,
+   quando alguma trava (nível, trégua, guerra já em curso) impede. */
+async function abrirGuerra(adv, alvo, membro, ficha){
+  var agora = Date.now();
+  if(alvo.guerraCooldownAte && alvo.guerraCooldownAte > agora){
+    var dias = Math.ceil((alvo.guerraCooldownAte-agora)/(24*60*60*1000));
+    return "⚔️ "+alvo.nome+" está sob trégua depois da última guerra: nenhuma nova campanha pode ser aberta pelos próximos "+dias+" dia(s).";
+  }
+  var gs = await carregarGuerras();
+  if(guerraDoElemento(gs, alvo.id)){
+    return "⚔️ Já existe uma guerra em curso por "+alvo.nome+". Espere o desfecho antes de abrir outra.";
+  }
+  var email = normEmail(membro.email);
+  var jaEmGuerra = guerrasAbertas(gs).filter(function(x){ return ladoDaGuerra(x, email)==="atacante"; })[0];
+  if(jaEmGuerra){
+    return "⚔️ "+(ficha && ficha.nome || membro.name || email)+" já comanda uma ofensiva por "+jaEmGuerra.elementoNome+". Um personagem só pode conduzir uma guerra de conquista por vez.";
+  }
+  var defensorFicha = await sGet("character:"+normEmail(alvo.dominio.email), true);
+  var guerra = {
+    id: "gr_"+agora.toString(36)+"_"+Math.random().toString(36).slice(2,7),
+    elementoId: alvo.id, elementoNome: alvo.nome, elementoTipo: alvo.tipo,
+    atacante: {
+      email: email, nome: membro.name||email,
+      personagem: (ficha && ficha.nome) || membro.name || email,
+      nivel: (ficha && ficha.nivel) || 1, campanhas: 0
+    },
+    defensor: {
+      email: normEmail(alvo.dominio.email), nome: alvo.dominio.nome || alvo.dominio.email,
+      personagem: alvo.dominio.personagem || alvo.dominio.email,
+      nivel: (defensorFicha && defensorFicha.nivel) || alvo.dominio.nivel || 1, campanhas: 0
+    },
+    abertaEm: agora, prazo: agora + GUERRA_PRAZO_MS,
+    status: "aberta", advId: adv.id, registro: []
+  };
+  await atualizarGuerras(function(g){ g.itens.push(guerra); });
+  var fort = FORTIFICACAO[alvo.tipo] || 0;
+  return "⚔️ GUERRA DECLARADA por "+alvo.nome+": "+guerra.atacante.personagem+" (nível "+guerra.atacante.nivel+") contra "+
+    guerra.defensor.personagem+" (nível "+guerra.defensor.nivel+", fortificação +"+fort+"). "+
+    "Os dois lados têm "+Math.round(GUERRA_PRAZO_MS/3600000)+" horas para conduzir campanhas (até "+GUERRA_MAX_CAMPANHAS+" cada) antes do confronto decisivo. O território NÃO mudou de mãos.";
+}
+
+/* A IA declara que houve uma ação de guerra na cena; o motor rola. */
+async function registrarAcoesDeGuerra(adv, lista){
+  var avisos = [], eventos = [];
+  if(!Array.isArray(lista) || !lista.length) return {avisos:avisos, eventos:eventos};
+  var gs = await carregarGuerras();
+  var abertas = guerrasAbertas(gs);
+  if(!abertas.length) return {avisos:avisos, eventos:eventos};
+  var membros = {};
+  (adv.members||[]).forEach(function(m){ if(m.status==="confirmado") membros[m.email] = m; });
+  if(!Object.keys(membros).length && session.email) membros[normEmail(session.email)] = {email:normEmail(session.email), name:session.name};
+
+  for(var i=0; i<Math.min(lista.length, 3); i++){
+    var a = lista[i] || {};
+    var email = normEmail(a.email||"");
+    if(!membros[email]) continue;
+    var guerra = abertas.filter(function(x){
+      if(ladoDaGuerra(x, email)===null) return false;
+      return !a.nome || normaliza(x.elementoNome)===normaliza(a.nome);
+    })[0];
+    if(!guerra) continue;
+    var lado = ladoDaGuerra(guerra, email);
+    var dados = guerra[lado];
+    if(dados.campanhas >= GUERRA_MAX_CAMPANHAS){
+      avisos.push("⚔️ "+dados.personagem+" já esgotou as campanhas possíveis por "+guerra.elementoNome+" — o que decide agora é o confronto final.");
+      continue;
+    }
+    var ficha = await sGet("character:"+email, true);
+    var nivelAtual = (ficha && ficha.nivel) || dados.nivel;
+    var dado = rollOne(20);
+    var mod = modGuerra(nivelAtual);
+    var cd = GUERRA_CD_CAMPANHA + dados.campanhas*2; // cada avanço custa mais que o anterior
+    var total = dado + mod;
+    var venceu = total >= cd;
+    var guerraId = guerra.id;
+    await atualizarGuerras(function(g){
+      var alvo = (g.itens||[]).filter(function(x){ return x.id===guerraId; })[0];
+      if(!alvo || alvo.status!=="aberta") return;
+      alvo[lado].nivel = nivelAtual;
+      if(venceu) alvo[lado].campanhas = Math.min(GUERRA_MAX_CAMPANHAS, (alvo[lado].campanhas||0)+1);
+      alvo.registro.push({em:Date.now(), lado:lado, dado:dado, mod:mod, cd:cd, total:total, sucesso:venceu});
+      if(alvo.registro.length>20) alvo.registro = alvo.registro.slice(-20);
+    });
+    avisos.push("⚔️ Campanha por "+guerra.elementoNome+" — "+dados.personagem+" ("+(lado==="atacante"?"ofensiva":"defesa")+
+      "): 1d20("+dado+")+"+mod+" = "+total+" contra CD "+cd+" — "+(venceu?"avanço conquistado":"o avanço fracassou")+
+      ". Campanhas: "+(venceu?dados.campanhas+1:dados.campanhas)+"/"+GUERRA_MAX_CAMPANHAS+".");
+    eventos.push({tipo: venceu ? "GUERRA_CAMPANHA_VENCIDA" : "GUERRA_CAMPANHA_PERDIDA", nome:guerra.elementoNome, email:email});
+  }
+  return {avisos:avisos, eventos:eventos};
+}
+
+/* Confronto decisivo: melhor de três. Empate na rodada favorece quem
+   defende — quem já governa só perde o território por margem clara. */
+function confrontoDecisivo(guerra){
+  var fort = FORTIFICACAO[guerra.elementoTipo] || 0;
+  var modA = forcaDeGuerra(guerra.atacante, 0);
+  var modD = forcaDeGuerra(guerra.defensor, fort);
+  var rodadas = [], vA = 0, vD = 0;
+  for(var i=0; i<3; i++){
+    var dA = rollOne(20), dD = rollOne(20);
+    var tA = dA + modA, tD = dD + modD;
+    var venc = tA > tD ? "atacante" : "defensor";
+    if(venc==="atacante") vA++; else vD++;
+    rodadas.push({dadoAtacante:dA, totalAtacante:tA, dadoDefensor:dD, totalDefensor:tD, vencedor:venc});
+    if(vA===2 || vD===2) break;
+  }
+  return {rodadas:rodadas, modAtacante:modA, modDefensor:modD, fortificacao:fort, vencedor: vA>vD ? "atacante" : "defensor"};
+}
+
+async function resolverGuerra(guerra){
+  var res = confrontoDecisivo(guerra);
+  var agora = Date.now();
+  var vencedorLado = res.vencedor;
+  var vencedor = guerra[vencedorLado];
+  var perdedor = guerra[vencedorLado==="atacante" ? "defensor" : "atacante"];
+
+  if(vencedorLado==="atacante"){
+    await atualizarCanonIndex(function(ix){
+      var el2 = (ix.elementos||[]).filter(function(e){ return e.id===guerra.elementoId; })[0];
+      if(!el2) return;
+      el2.dominio = {
+        email: guerra.atacante.email, nome: guerra.atacante.nome,
+        personagem: guerra.atacante.personagem, nivel: guerra.atacante.nivel,
+        desde: agora, advId: guerra.advId, porGuerra: true,
+        tomadoDe: guerra.defensor.personagem
+      };
+      el2.guerraCooldownAte = agora + GUERRA_COOLDOWN_MS;
+    });
+  } else {
+    await atualizarCanonIndex(function(ix){
+      var el3 = (ix.elementos||[]).filter(function(e){ return e.id===guerra.elementoId; })[0];
+      if(el3) el3.guerraCooldownAte = agora + GUERRA_COOLDOWN_MS;
+    });
+  }
+  await atualizarGuerras(function(g){
+    var alvo = (g.itens||[]).filter(function(x){ return x.id===guerra.id; })[0];
+    if(alvo && alvo.status==="aberta"){ alvo.status = "resolvida"; alvo.resultado = res; alvo.resolvidaEm = agora; }
+  });
+  try{
+    var log = await sGet("canon-log", true) || [];
+    log.push({em:agora, tipo:"guerra", elemento:guerra.elementoNome, vencedor:vencedor.email, perdedor:perdedor.email, rodadas:res.rodadas.length});
+    await sSet("canon-log", log.slice(-200), true);
+  }catch(e){ /* auditoria é acessório */ }
+
+  var placar = res.rodadas.map(function(r){ return r.totalAtacante+"×"+r.totalDefensor; }).join(", ");
+  var aviso = "⚔️ GUERRA DECIDIDA — "+guerra.elementoNome+": "+
+    (vencedorLado==="atacante"
+      ? (vencedor.personagem+" toma o território de "+perdedor.personagem+".")
+      : (vencedor.personagem+" resiste e mantém o território; a ofensiva de "+perdedor.personagem+" fracassa."))+
+    " Confronto (ataque +"+res.modAtacante+" contra defesa +"+res.modDefensor+", fortificação +"+res.fortificacao+"): "+placar+
+    ". Trégua de "+Math.round(GUERRA_COOLDOWN_MS/(24*3600000))+" dias sobre este território.";
+  return {aviso:aviso, evento:{tipo:"GUERRA_RESOLVIDA", nome:guerra.elementoNome, email:vencedor.email}};
+}
+
+/* Varredura: guerras cujo prazo venceu, ou em que os dois lados já
+   esgotaram as campanhas, vão direto ao confronto. Chamada a cada turno
+   processado — o mesmo padrão de watchdog usado nos ciclos assíncronos,
+   já que não há agendador garantido do lado do servidor. */
+async function resolverGuerrasVencidas(){
+  var avisos = [], eventos = [];
+  var gs = await carregarGuerras();
+  var maduras = guerrasAbertas(gs).filter(function(x){
+    var esgotou = (x.atacante.campanhas>=GUERRA_MAX_CAMPANHAS && x.defensor.campanhas>=GUERRA_MAX_CAMPANHAS);
+    return esgotou || Date.now() >= x.prazo;
+  });
+  for(var i=0; i<maduras.length; i++){
+    try{
+      var r = await resolverGuerra(maduras[i]);
+      avisos.push(r.aviso); eventos.push(r.evento);
+    }catch(err){ console.warn("Falha ao resolver guerra:", err); }
+  }
+  return {avisos:avisos, eventos:eventos};
+}
+
+/* Bloco de contexto: o Mestre precisa saber quem desta mesa está em
+   guerra, para oferecer cenas de campanha — sem nunca decidir o desfecho. */
+function blocoGuerrasParaPrompt(adv, guerrasCache){
+  var gs = guerrasCache || guerrasCacheAtual || {itens:[]};
+  var emails = {};
+  (adv.members||[]).forEach(function(m){ if(m.status==="confirmado") emails[m.email]=m; });
+  if(!Object.keys(emails).length && session.email) emails[normEmail(session.email)] = {name:session.name};
+  var minhas = guerrasAbertas(gs).filter(function(x){
+    return emails[normEmail(x.atacante.email)] || emails[normEmail(x.defensor.email)];
+  });
+  if(!minhas.length) return "";
+  var linhas = minhas.map(function(x){
+    var horas = Math.max(0, Math.round((x.prazo-Date.now())/3600000));
+    return "- "+x.elementoNome+": "+x.atacante.personagem+" (ofensiva, "+x.atacante.campanhas+"/"+GUERRA_MAX_CAMPANHAS+" campanhas) contra "+
+      x.defensor.personagem+" (defesa, "+x.defensor.campanhas+"/"+GUERRA_MAX_CAMPANHAS+"). Confronto decisivo em cerca de "+horas+"h.";
+  }).join("\n");
+  return "\n\nGUERRAS EM CURSO envolvendo esta mesa:\n"+linhas+
+    "\nOfereça cenas que permitam avançar nessa guerra — cercos, sabotagem, alianças, suprimentos, muralhas. Sempre que um personagem dedicar uma ação da cena a essa guerra, declare-a em \"acoesDeGuerra\". NUNCA narre o resultado da campanha nem o desfecho da guerra: o aplicativo rola e responde no turno seguinte.";
+}
+var guerrasCacheAtual = null;
+async function carregarGuerrasParaPrompt(){
+  try{ guerrasCacheAtual = await carregarGuerras(); }catch(e){ guerrasCacheAtual = {itens:[]}; }
+  return guerrasCacheAtual;
+}
+
+/* Regras de mundo compartilhado em texto curto, para os prompts
+   assíncronos (que não passam por advBody). */
+function blocoRegrasMundoAssincrono(adv){
+  var gates = obterNiveisDominio();
+  var partes = ["\n\nMUNDO COMPARTILHADO — modo: "+MODOS_MUNDO[modoMundoDe(adv)].label+"."];
+  if(modoMundoDe(adv)==="compartilhado"){
+    partes.push("Não crie cidades, regiões, países, mundos, facções nem NPCs recorrentes fora do cânone listado acima.");
+  }
+  if(advAlimentaCanon(adv)){
+    partes.push("Liste em \"mundoPropostas\" (máx. 4) os elementos permanentes que este dia estabeleceu. Isso é uma proposta, não vira oficial sozinho.");
+  } else {
+    partes.push("Devolva \"mundoPropostas\": [].");
+  }
+  partes.push("Ações dedicadas a uma guerra em curso vão em \"acoesDeGuerra\" — nunca narre o resultado delas: o motor rola e responde depois.");
+  partes.push("Conquistas de território vão em \"dominiosReivindicados\" e NUNCA podem ser narradas como já consumadas: o aplicativo confere o nível do personagem e decide (cidade nível "+gates.cidade+"+, região "+gates.regiao+"+, país "+gates.pais+"+, mundo "+gates.mundo+"+).");
+  return partes.join(" ");
+}
 function narratividadeInstrucao(){
   var nivel = (adminConfig && NARRATIVIDADE_NIVEIS[adminConfig.narratividade]) ? adminConfig.narratividade : "media";
   return NARRATIVIDADE_NIVEIS[nivel];
@@ -2541,7 +3258,7 @@ function buildAdvSystemPrompt(mode, rosterText, sheetsBlock, adv){
  var intro = mode==="grupo" ? ADV_INTRO_GROUP : ADV_INTRO_SOLO;
  var pdfNote = SISTEMA_REGRAS;
  var roster = rosterText ? ("PARTICIPANTES DESTA AVENTURA:\n"+rosterText+"\n\n") : "";
- return intro + pdfNote + (mode==="grupo" ? roster : "") + (sheetsBlock||"") + advBody(mode==="grupo", adv);
+ return intro + pdfNote + (mode==="grupo" ? roster : "") + (sheetsBlock||"") + advBody(mode==="grupo", adv) + blocoMundoParaPrompt(adv);
 }
 
 /* =========================================================
@@ -2947,6 +3664,7 @@ function abrirModalCompanheiros(){
   el("companions-desc-field").classList.add("hidden");
   el("companions-confirm").disabled = true;
   document.querySelectorAll(".companions-opt").forEach(function(b){ b.classList.remove("selected"); });
+  renderSeletorMundo("companions");
   el("companions-overlay").classList.remove("hidden");
 }
 el("companions-close").addEventListener("click", function(){ el("companions-overlay").classList.add("hidden"); });
@@ -2967,7 +3685,7 @@ el("companions-confirm").addEventListener("click", async function(){
     var companionOpts = companionsChoice==="com"
       ? { ativados:true, descricao: el("companions-desc").value }
       : null;
-    var adv = await createAdventure("solo", "Aventura Solo", [], companionOpts);
+    var adv = await createAdventure("solo", "Aventura Solo", [], companionOpts, null, lerSelecaoMundo("companions"));
     logAdminEvent("adventure_created", {id:adv.id, name:adv.name, mode:adv.mode, hostEmail:session.email, companheiros:!!(companionOpts&&companionOpts.ativados)});
     el("companions-overlay").classList.add("hidden");
     await enterPlay(adv.id, adv);
@@ -3155,7 +3873,7 @@ function maybeActivateAdventure(adv){
  return adv;
 }
 
-async function createAdventure(mode, name, inviteEmails, companionOpts, groupMode){
+async function createAdventure(mode, name, inviteEmails, companionOpts, groupMode, mundoOpts){
  var id = "adv_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,8);
  var now = Date.now();
  var members = [{email:session.email, name:session.name, status:"confirmado", invitedAt:now, respondedAt:now}];
@@ -3175,6 +3893,15 @@ async function createAdventure(mode, name, inviteEmails, companionOpts, groupMod
  members: members,
  scenes: mode==="solo" ? [{id:"principal", nome:"Principal", memberEmails:[session.email]}] : [],
  activeSceneId: mode==="solo" ? "principal" : null
+ };
+ // Fase 10: modo de mundo (compartilhado / híbrido / novo). Fica gravado na
+ // aventura porque decide tanto o que vai no prompt quanto se o que a cena
+ // criar alimenta o cânone.
+ var modoMundoEscolhido = (mundoOpts && MODOS_MUNDO[mundoOpts.modo]) ? mundoOpts.modo : "hibrido";
+ adv.mundo = {
+   modo: modoMundoEscolhido,
+   mundoId: (MODOS_MUNDO[modoMundoEscolhido].usaCanon && mundoOpts && mundoOpts.mundoId) ? mundoOpts.mundoId : null,
+   alimenta: MODOS_MUNDO[modoMundoEscolhido].alimenta
  };
  // Fase 5: companheiros de IA (só faz sentido em modo solo — em grupo os
  // outros jogadores já cumprem esse papel).
@@ -3210,6 +3937,7 @@ function openNewAdvModal(){
    asyncRadio.disabled = false;
    asyncOpt.title = "";
  }
+ renderSeletorMundo("newadv");
  el("newadv-overlay").classList.remove("hidden");
 }
 el("newadv-close").addEventListener("click", function(){ el("newadv-overlay").classList.add("hidden"); });
@@ -3247,7 +3975,7 @@ el("newadv-create").addEventListener("click", async function(){
  try{
  var lim = await podeCriarAventura("grupo");
  if(!lim.ok){ errBox.innerHTML = esc(lim.motivo)+' <a href="#" id="newadv-upgrade-link">Ver planos</a>'; errBox.classList.remove("hidden"); btn.disabled=false; btn.textContent="Criar aventura"; var upL=el("newadv-upgrade-link"); if(upL) upL.addEventListener("click", function(e){ e.preventDefault(); abrirUpgrade("limite_aventuras"); }); return; }
- var adv = await createAdventure("grupo", name, emails, null, groupMode);
+ var adv = await createAdventure("grupo", name, emails, null, groupMode, lerSelecaoMundo("newadv"));
  logAdminEvent("adventure_created", {id:adv.id, name:adv.name, mode:adv.mode, groupMode:adv.groupMode, hostEmail:session.email});
  el("newadv-overlay").classList.add("hidden");
  await enterLobby(adv.id, adv);
@@ -4671,6 +5399,9 @@ async function runGmTurn(advId, sceneId){
         "Objetivo final do evento: " + adv.eventoContexto.objetivo + "\n" +
         "Construa a aventura a partir disso. Voce narra APENAS para o grupo listado abaixo; outros grupos vivem a mesma historia em paralelo, entao nao mencione nem controle personagens fora deste grupo, e nao divida nem remaneje cenas.\n\n";
     }
+    // Fase 10: o bloco do mundo compartilhado é montado de forma síncrona a
+    // partir do cache — então o cânone precisa estar carregado ANTES do prompt.
+    try{ await carregarCanonIndex(); await carregarGuerrasParaPrompt(); }catch(e){ console.warn("Cânone indisponível neste turno:", e); }
     var sys = buildAdvSystemPrompt(adv.mode, rosterText, ctxEvento + buildSheetsBlock(adv, sheetsByEmail), adv);
 
  var contents=[];
@@ -4986,6 +5717,20 @@ async function runGmTurn(advId, sceneId){
      advChanged = true;
    }
  }
+ // Fase 10 — mundo compartilhado: colhe o que a cena criou e julga as
+ // reivindicações de domínio. O veredito volta como mensagem de sistema
+ // (visível ao jogador e presente no contexto do Mestre no turno seguinte),
+ // nunca como algo que a IA possa declarar sozinha.
+ try{
+   var resMundo = await processarMundoCompartilhado(freshAdv, data);
+   if(resMundo.eventos && resMundo.eventos.length) eventosMotor = eventosMotor.concat(resMundo.eventos);
+   if(resMundo.avisos && resMundo.avisos.length){
+     var msgsMundo = await appendSceneMessages(advId, sceneId, resMundo.avisos.map(function(t){
+       return {role:"user", kind:"system", display:true, ts:Date.now(), text:t};
+     }));
+     if(msgsMundo){ lastSeenMsgCount = msgsMundo.length; renderPlayChat(msgsMundo); }
+   }
+ }catch(e){ console.warn("Falha ao processar o mundo compartilhado:", e); }
  if(eventosMotor.length){
    try{
      var logMotor2 = await registrarEventos(advId, sceneId, eventosMotor, "motor");
@@ -5763,6 +6508,8 @@ async function gerarAberturaDeCiclo(adv, ciclo){
       (estadoTexto ? "\n\nEstado atual da aventura (nunca contradiga isto):\n"+estadoTexto : "");
   }
 
+  try{ await carregarCanonIndex(); await carregarGuerrasParaPrompt(); }catch(e){ console.warn("Cânone indisponível na abertura do ciclo:", e); }
+  contexto += blocoMundoResumidoParaPrompt(adv) + blocoGuerrasParaPrompt(adv);
   var sistema = "Você é o Mestre de uma aventura de RPG de fantasia em GRUPO ASSÍNCRONO. "+
     (ehPrimeiroCiclo
       ? "Dê boas-vindas ao grupo e narre a abertura de um gancho de aventura, considerando as fichas de todos os personagens do elenco."
@@ -5966,7 +6713,10 @@ var ASYNC_RESOLUTION_NARRATE_SYSTEM = "Você é o Mestre de uma aventura de RPG 
   '"itensGanhos":[{"email":"...","itens":["..."]}],"itensPerdidos":[{"email":"...","itens":["..."]}],'+
   '"magiasAprendidas":[{"email":"...","magias":["..."]}],"magiasPerdidas":[{"email":"...","magias":["..."]}],'+
   '"eventos":[{"tipo":"COMBATE_FINALIZADO","inimigosDerrotados":0,"email":"..."}],'+
-  '"estadoNarrativo":{"objetivo":null,"proximoPasso":null,"ganchosAtivos":null}}\n\n'+
+  '"estadoNarrativo":{"objetivo":null,"proximoPasso":null,"ganchosAtivos":null},'+
+  '"mundoPropostas":[{"tipo":"npc"|"faccao"|"local"|"cidade"|"regiao"|"pais"|"mundo","nome":"...","resumo":"...","paiNome":null}],'+
+  '"dominiosReivindicados":[{"email":"...","nome":"nome exato do elemento","tipoAcao":"controle"|"dominio"}],'+
+  '"acoesDeGuerra":[{"email":"...","nome":"elemento em disputa","tipo":"ataque"|"defesa"}]}\n\n'+
   "Regras: 1) \"fichas\" segue a mesma convenção do resto do app — inclua só os campos que mudaram, repita valores que não sabe em vez de inventar, nunca altere identidade (nome/ancestralidade/classe). 2) NUNCA calcule XP, dano ou resultado de teste sozinho — use exatamente os números fornecidos. 3) \"eventos\" só com os tipos padrão do app (ex.: COMBATE_FINALIZADO, XP_GANHO, ITEM_GANHO, NPC_INTRODUZIDO, LOCAL_DESCOBERTO) — tipos desconhecidos são ignorados pelo app, então não invente novos. 4) informação que só um personagem descobriu (segredo, pista privada) vai em \"resumoIndividual\" dele, NUNCA em \"narrativaColetiva\" nem em \"resultadoColetivo\", a menos que haja um motivo narrativo explícito pra virar público — \"resultadoColetivo\" é visível para TODOS os jogadores da aventura, então trate cada frase como algo que o grupo inteiro poderia saber. 5) omita ou deixe null qualquer campo de \"estadoNarrativo\" que não mudou. 6) \"resultadoColetivo\" deve ter no máximo uma frase por jogador envolvido nesta cena — pode ficar vazio se nada for digno de nota coletivamente.";
 
 /* Monta o texto de contexto (ordens + decisões automáticas + testes já
@@ -5999,6 +6749,9 @@ async function resolverCena(adv, ciclo, ordensDaCena, sceneId){
   var contexto = montarOrdensParaResolucao(ordensDaCena, adv);
   var estadoTexto = formatarEstadoNarrativoParaPrompt(adv.estadoNarrativo);
   var blocoEstado = estadoTexto ? "\n\nESTADO ATUAL DA AVENTURA (nunca contradiga isto):\n"+estadoTexto : "";
+  // Fase 10: o ciclo assíncrono também joga no mundo compartilhado.
+  try{ await carregarCanonIndex(); await carregarGuerrasParaPrompt(); }catch(e){ console.warn("Cânone indisponível neste ciclo:", e); }
+  blocoEstado += blocoMundoResumidoParaPrompt(adv) + blocoGuerrasParaPrompt(adv) + blocoRegrasMundoAssincrono(adv);
   var raw1 = await callGeminiRaw(ASYNC_RESOLUTION_TESTS_SYSTEM, [{role:"user", parts:[{text:"ORDENS DA CENA (já travadas):\n\n"+contexto+blocoEstado}]}]);
   var slice1 = sliceJsonObject(raw1);
   var decl = slice1 ? (JSON.parse(slice1.json)) : {ordem:[], testes:[]};
@@ -6038,6 +6791,12 @@ async function resolverCena(adv, ciclo, ordensDaCena, sceneId){
     if(r.falhaCritica) eventosMotor.push({tipo:"TESTE_FALHA_CRITICA", email:em});
   });
   if(data.eventos && Array.isArray(data.eventos)) eventosMotor = eventosMotor.concat(data.eventos);
+  var avisosMundo = [];
+  try{
+    var resMundoAsync = await processarMundoCompartilhado(adv, data);
+    if(resMundoAsync.eventos && resMundoAsync.eventos.length) eventosMotor = eventosMotor.concat(resMundoAsync.eventos);
+    avisosMundo = resMundoAsync.avisos || [];
+  }catch(e){ console.warn("Falha ao processar o mundo compartilhado (async):", e); }
   if(eventosMotor.length){
     try{ var logAtualizado = await registrarEventos(adv.id, sceneId, eventosMotor, "ia-async"); if(logAtualizado) eventLogAtual = logAtualizado; }
     catch(e){ console.warn("Falha ao registrar eventos do ciclo assíncrono:", e); }
@@ -6087,6 +6846,9 @@ async function resolverCena(adv, ciclo, ordensDaCena, sceneId){
   var resultadoColetivo = (Array.isArray(data.resultadoColetivo) ? data.resultadoColetivo : [])
     .filter(function(r){ return r && r.texto && emailsEnvolvidos.indexOf(normEmail(r.playerEmail))!==-1; })
     .map(function(r){ return {playerEmail:normEmail(r.playerEmail), texto:String(r.texto).slice(0,240)}; });
+  // Fase 10: o veredito do motor sobre domínios vira linha pública do dia —
+  // é uma consequência determinística, não uma frase narrada pela IA.
+  avisosMundo.forEach(function(t){ resultadoColetivo.push({playerEmail:"", texto:String(t).slice(0,240)}); });
   return {
     outcomes: outcomes,
     narrativaColetiva: data.narrativaColetiva || "",
@@ -6589,6 +7351,9 @@ function montarHtmlResultadoDia(diario){
     if(diario.narrativeSummary) html += '<div class="async-result-narrative">'+esc(diario.narrativeSummary).replace(/\n/g,"<br>")+'</div>';
     if((diario.collectiveHighlights||[]).length){
       html += '<ul class="async-collective-list">'+diario.collectiveHighlights.map(function(h){
+        // Fase 10: linhas sem playerEmail vêm do motor (veredito de domínio
+        // no mundo compartilhado), não de um jogador — não levam nome.
+        if(!h.playerEmail) return '<li>'+esc(h.texto)+'</li>';
         var nome = (membrosPorEmail[h.playerEmail]&&membrosPorEmail[h.playerEmail].name) || h.playerEmail;
         return '<li><b>'+esc(nome)+':</b> '+esc(h.texto)+'</li>';
       }).join("")+'</ul>';
@@ -9163,6 +9928,11 @@ async function openAdmin(){
     }
     html += '</div>';
 
+    /* ===== mundo compartilhado (Fase 10) ===== */
+    html += '<div class="adm-section"><h4>Mundo compartilhado</h4>'+
+      '<p class="adm-note">Curadoria do cânone: o que as aventuras criaram, o que já é oficial, quem domina o quê e os níveis mínimos de conquista.</p>'+
+      '<div class="input-with-btn" style="margin-top:8px;"><button type="button" class="ghost-btn" id="admin-abrir-mundo" style="flex:1;padding:11px;">Abrir curadoria do mundo</button></div></div>';
+
     /* ===== importação de histórico antigo ===== */
     if(useFirestore()){
       html += '<div class="adm-section"><h4>Importar histórico antigo</h4>'+
@@ -9279,6 +10049,8 @@ async function openAdmin(){
       try{ await sSet("subscription:"+email, {email:email, ativo:false, revogadoEm:Date.now(), revogadoPor:session.email}, true); alert("Plano revogado para "+email+"."); openAdmin(); }
       catch(err){ alert("Falha ao revogar: "+err.message); }
     });
+    var mundoBtn = el("admin-abrir-mundo");
+    if(mundoBtn) mundoBtn.addEventListener("click", function(){ abrirMundo(); });
     var migBtn = el("admin-migrar");
     if(migBtn) migBtn.addEventListener("click", async function(){
       if(!confirm("Importar o histórico antigo para o Firebase?\n\nNada é apagado: registros que já existem no Firebase são mantidos como estão.")) return;
@@ -9302,6 +10074,469 @@ async function openAdmin(){
     el("admin-body").innerHTML = '<p class="card-error">Erro ao carregar: '+esc(err.message)+'</p>';
   }
 }
+
+/* =========================================================
+   FASE 10 — UI DO MUNDO COMPARTILHADO
+   ========================================================= */
+
+/* ---- seletor de modo de mundo (criação de aventura) ---- */
+async function renderSeletorMundo(prefixo){
+  var box = el(prefixo+"-worldmode-options");
+  if(!box) return;
+  box.innerHTML = Object.keys(MODOS_MUNDO).map(function(k, i){
+    var m = MODOS_MUNDO[k];
+    return '<label class="groupmode-opt worldmode-opt"><input type="radio" name="'+prefixo+'-worldmode" value="'+k+'"'+(k==="hibrido"?" checked":"")+'>'+
+      '<div class="groupmode-opt-body"><b>'+esc(m.label)+'</b><span>'+esc(m.desc)+'</span></div></label>';
+  }).join("");
+  var pickField = el(prefixo+"-world-pick-field");
+  var pick = el(prefixo+"-world-pick");
+  var mundos = [];
+  try{
+    var idx = await carregarCanonIndex(true);
+    mundos = (idx.elementos||[]).filter(function(e){ return e.tipo==="mundo"; });
+  }catch(e){ /* sem cânone disponível: segue sem a lista */ }
+  if(pick){
+    pick.innerHTML = '<option value="">Todo o cânone (sem recorte de mundo)</option>'+
+      mundos.map(function(m){ return '<option value="'+esc(m.id)+'">'+esc(m.nome)+'</option>'; }).join("");
+  }
+  function atualizarVisibilidade(){
+    var sel = document.querySelector('input[name="'+prefixo+'-worldmode"]:checked');
+    var usa = sel && MODOS_MUNDO[sel.value] && MODOS_MUNDO[sel.value].usaCanon;
+    if(pickField) pickField.classList.toggle("hidden", !(usa && mundos.length));
+  }
+  box.querySelectorAll('input[type="radio"]').forEach(function(r){
+    r.addEventListener("change", atualizarVisibilidade);
+  });
+  atualizarVisibilidade();
+}
+function lerSelecaoMundo(prefixo){
+  var sel = document.querySelector('input[name="'+prefixo+'-worldmode"]:checked');
+  var pick = el(prefixo+"-world-pick");
+  return {
+    modo: (sel && MODOS_MUNDO[sel.value]) ? sel.value : "hibrido",
+    mundoId: (pick && pick.value) ? pick.value : null
+  };
+}
+
+/* ---- painel do mundo ---- */
+var mundoAba = "canone";
+var mundoFiltroTipo = "";
+function ehAdminMundo(){ return normEmail(session.email)===ADMIN_EMAIL; }
+
+async function abrirMundo(){
+  mundoAba = "canone";
+  el("mundo-overlay").classList.remove("hidden");
+  await renderMundo();
+}
+el("hub-world").addEventListener("click", abrirMundo);
+el("mundo-close").addEventListener("click", function(){ el("mundo-overlay").classList.add("hidden"); });
+el("mundo-overlay").addEventListener("click", function(e){ if(e.target===el("mundo-overlay")) el("mundo-overlay").classList.add("hidden"); });
+
+function renderMundoTabs(qtdPendentes, qtdGuerras){
+  var abas = [{k:"canone", t:"Cânone"}, {k:"dominios", t:"Domínios"}, {k:"guerras", t:"Guerras"+(qtdGuerras?" ("+qtdGuerras+")":"")}];
+  if(ehAdminMundo()){
+    abas.splice(1, 0, {k:"pendentes", t:"Curadoria"+(qtdPendentes?" ("+qtdPendentes+")":"")});
+    abas.push({k:"regras", t:"Regras"});
+  }
+  el("mundo-tabs").innerHTML = abas.map(function(a){
+    return '<button type="button" class="mundo-tab'+(mundoAba===a.k?" on":"")+'" data-aba="'+a.k+'">'+esc(a.t)+'</button>';
+  }).join("");
+  el("mundo-tabs").querySelectorAll("[data-aba]").forEach(function(b){
+    b.addEventListener("click", function(){ mundoAba = b.getAttribute("data-aba"); renderMundo(); });
+  });
+}
+
+async function renderMundo(){
+  el("mundo-body").innerHTML = '<p class="modal-note">Carregando…</p>';
+  try{
+    await loadAdminConfig();
+    var idx = await carregarCanonIndex(true);
+    var pend = ehAdminMundo() ? await carregarCanonPendentes() : {itens:[]};
+    var naFila = (pend.itens||[]).filter(function(i){ return i.status==="pendente"; });
+    var gs = await carregarGuerras();
+    renderMundoTabs(naFila.length, guerrasAbertas(gs).length);
+    if(mundoAba==="canone") renderMundoCanone(idx);
+    else if(mundoAba==="pendentes") renderMundoPendentes(naFila, idx);
+    else if(mundoAba==="dominios") renderMundoDominios(idx);
+    else if(mundoAba==="guerras") renderMundoGuerras(gs);
+    else renderMundoRegras();
+  }catch(err){
+    el("mundo-body").innerHTML = '<p class="card-error">Erro ao carregar o mundo: '+esc(err.message||String(err))+'</p>';
+  }
+}
+
+function renderMundoCanone(idx){
+  var porId = {}; (idx.elementos||[]).forEach(function(e){ porId[e.id]=e; });
+  var gates = obterNiveisDominio();
+  var tipos = Object.keys(CANON_TIPOS).sort(function(a,b){ return CANON_TIPOS[b].ordem-CANON_TIPOS[a].ordem; });
+  var html = '<p class="adm-note">Estes são os elementos oficiais do mundo compartilhado: toda aventura em modo compartilhado ou híbrido os recebe como verdade e não pode contradizê-los.</p>';
+  html += '<div class="input-with-btn" style="margin:10px 0;">'+
+    '<input id="mundo-busca" class="text-input" placeholder="Buscar por nome…">'+
+    (ehAdminMundo() ? '<button type="button" class="ghost-btn" id="mundo-novo">+ Criar</button>' : '')+
+    '</div>';
+  var lista = (idx.elementos||[]).slice().sort(function(a,b){
+    var d = (CANON_TIPOS[b.tipo]||{ordem:0}).ordem - (CANON_TIPOS[a.tipo]||{ordem:0}).ordem;
+    return d || String(a.nome).localeCompare(String(b.nome));
+  });
+  if(!lista.length){
+    html += '<p class="mundo-empty">Nada foi fixado ainda. O que as aventuras criarem aparece na aba <b>Curadoria</b> para ser aprovado e virar cânone.</p>';
+  } else {
+    html += '<div id="mundo-lista">';
+    tipos.forEach(function(t){
+      var doTipo = lista.filter(function(e){ return e.tipo===t; });
+      if(!doTipo.length) return;
+      html += '<h4 style="margin:14px 0 6px;color:var(--text-hi);font-size:12.5px;">'+CANON_TIPOS[t].icone+' '+esc(CANON_TIPOS[t].plural)+'</h4>';
+      doTipo.forEach(function(e){
+        var pai = (e.paiId && porId[e.paiId]) ? porId[e.paiId].nome : null;
+        html += '<div class="canon-row" data-nome="'+esc(normaliza(e.nome))+'">'+
+          '<span class="cr-ico">'+CANON_TIPOS[t].icone+'</span>'+
+          '<span class="cr-body"><b>'+esc(e.nome)+'</b>'+
+          '<span>'+(pai ? '<span class="canon-tag">em '+esc(pai)+'</span>' : '')+
+          (gates[t]>1 ? '<span class="canon-tag bloq">nível '+gates[t]+'+ para dominar</span>' : '')+
+          (e.dominio ? '<span class="canon-tag dom">👑 '+esc(e.dominio.personagem||e.dominio.email)+'</span>' : '')+
+          '</span>'+
+          (e.resumo ? '<span>'+esc(e.resumo)+'</span>' : '')+'</span>'+
+          (ehAdminMundo() ? '<span class="cr-acts"><button class="mk-btn sec" data-canon-editar="'+esc(e.id)+'">Editar</button><button class="mk-btn sec" data-canon-remover="'+esc(e.id)+'">Remover</button></span>' : '')+
+          '</div>';
+      });
+    });
+    html += '</div>';
+  }
+  el("mundo-body").innerHTML = html;
+
+  var busca = el("mundo-busca");
+  if(busca) busca.addEventListener("input", function(){
+    var q = normaliza(busca.value);
+    el("mundo-body").querySelectorAll(".canon-row").forEach(function(r){
+      r.style.display = (!q || (r.getAttribute("data-nome")||"").indexOf(q)!==-1) ? "" : "none";
+    });
+  });
+  var novoBtn = el("mundo-novo");
+  if(novoBtn) novoBtn.addEventListener("click", function(){ abrirEditorCanon(null, null); });
+  el("mundo-body").querySelectorAll("[data-canon-editar]").forEach(function(b){
+    b.addEventListener("click", function(){
+      var alvo = (idx.elementos||[]).filter(function(e){ return e.id===b.getAttribute("data-canon-editar"); })[0];
+      if(alvo) abrirEditorCanon(alvo, null);
+    });
+  });
+  el("mundo-body").querySelectorAll("[data-canon-remover]").forEach(function(b){
+    b.addEventListener("click", async function(){
+      var id = b.getAttribute("data-canon-remover");
+      var alvo = (idx.elementos||[]).filter(function(e){ return e.id===id; })[0];
+      if(!alvo) return;
+      if(!confirm("Remover \""+alvo.nome+"\" do cânone?\n\nAventuras em andamento deixam de recebê-lo no contexto do Mestre. Isso não apaga o que já foi narrado.")) return;
+      b.disabled = true;
+      try{
+        await atualizarCanonIndex(function(ix){ ix.elementos = (ix.elementos||[]).filter(function(e){ return e.id!==id; }); });
+        try{ await sDel("canon-entry:"+id, true); }catch(e){}
+        await renderMundo();
+      }catch(err){ alert("Falha ao remover: "+(err.message||err)); b.disabled=false; }
+    });
+  });
+}
+
+function renderMundoPendentes(fila, idx){
+  var html = '<p class="adm-note">O que as aventuras criaram e ainda não é oficial. Fixar um item o torna cânone para <b>todas</b> as aventuras que usam o mundo compartilhado.</p>';
+  if(!fila.length){
+    html += '<p class="mundo-empty">Nada na fila. Assim que uma aventura estabelecer um NPC, local ou facção novo, ele aparece aqui.</p>';
+  } else {
+    html += fila.slice().reverse().map(function(i){
+      var t = CANON_TIPOS[i.tipo] || CANON_TIPOS.local;
+      return '<div class="canon-row">'+
+        '<span class="cr-ico">'+t.icone+'</span>'+
+        '<span class="cr-body"><b>'+esc(i.nome)+'</b>'+
+        '<span><span class="canon-tag">'+esc(t.label)+'</span>'+
+        '<span class="canon-tag">de: '+esc(i.origemAdvNome||i.origemAdvId||"—")+'</span>'+
+        (i.paiNome ? '<span class="canon-tag">em '+esc(i.paiNome)+'</span>' : '')+'</span>'+
+        (i.resumo ? '<span>'+esc(i.resumo)+'</span>' : '')+'</span>'+
+        '<span class="cr-acts">'+
+        '<button class="mk-btn sec" data-pend-fixar="'+esc(i.id)+'">Fixar…</button>'+
+        '<button class="mk-btn sec" data-pend-descartar="'+esc(i.id)+'">Descartar</button>'+
+        '</span></div>';
+    }).join("");
+  }
+  el("mundo-body").innerHTML = html;
+
+  el("mundo-body").querySelectorAll("[data-pend-fixar]").forEach(function(b){
+    b.addEventListener("click", function(){
+      var alvo = fila.filter(function(i){ return i.id===b.getAttribute("data-pend-fixar"); })[0];
+      if(alvo) abrirEditorCanon(null, alvo);
+    });
+  });
+  el("mundo-body").querySelectorAll("[data-pend-descartar]").forEach(function(b){
+    b.addEventListener("click", async function(){
+      var id = b.getAttribute("data-pend-descartar");
+      b.disabled = true;
+      try{
+        await atualizarCanonPendentes(function(p){
+          p.itens = (p.itens||[]).filter(function(i){ return i.id!==id; });
+        });
+        await renderMundo();
+      }catch(err){ alert("Falha ao descartar: "+(err.message||err)); b.disabled=false; }
+    });
+  });
+}
+
+function renderMundoDominios(idx){
+  var gates = obterNiveisDominio();
+  var comDono = (idx.elementos||[]).filter(function(e){ return !!e.dominio; });
+  var html = '<p class="adm-note">Quem controla o quê no mundo compartilhado. O domínio só é concedido pelo motor do jogo, depois de conferir o nível do personagem — a IA nunca o concede sozinha.</p>';
+  html += '<p class="adm-note" style="margin-top:8px;">Exigências atuais: cidade nível <b>'+gates.cidade+'</b>, região <b>'+gates.regiao+'</b>, país <b>'+gates.pais+'</b>, mundo <b>'+gates.mundo+'</b>.</p>';
+  if(!comDono.length){
+    html += '<p class="mundo-empty">Nenhum território tem dono ainda.</p>';
+  } else {
+    html += comDono.map(function(e){
+      var t = CANON_TIPOS[e.tipo] || CANON_TIPOS.local;
+      return '<div class="canon-row"><span class="cr-ico">'+t.icone+'</span>'+
+        '<span class="cr-body"><b>'+esc(e.nome)+'</b><span>'+
+        '<span class="canon-tag dom">👑 '+esc(e.dominio.personagem||e.dominio.email)+'</span>'+
+        '<span class="canon-tag">'+esc(t.label)+'</span>'+
+        '<span class="canon-tag">nível '+(e.dominio.nivel||"?")+' na conquista</span>'+
+        '<span class="canon-tag">'+new Date(e.dominio.desde||Date.now()).toLocaleDateString("pt-BR")+'</span>'+
+        '</span></span>'+
+        (ehAdminMundo() ? '<span class="cr-acts"><button class="mk-btn sec" data-dom-revogar="'+esc(e.id)+'">Revogar</button></span>' : '')+
+        '</div>';
+    }).join("");
+  }
+  el("mundo-body").innerHTML = html;
+  el("mundo-body").querySelectorAll("[data-dom-revogar]").forEach(function(b){
+    b.addEventListener("click", async function(){
+      var id = b.getAttribute("data-dom-revogar");
+      if(!confirm("Revogar o domínio deste elemento?")) return;
+      b.disabled = true;
+      try{
+        await atualizarCanonIndex(function(ix){
+          var alvo = (ix.elementos||[]).filter(function(e){ return e.id===id; })[0];
+          if(alvo) alvo.dominio = null;
+        });
+        await renderMundo();
+      }catch(err){ alert("Falha ao revogar: "+(err.message||err)); b.disabled=false; }
+    });
+  });
+}
+
+
+function renderMundoGuerras(gs){
+  var abertas = guerrasAbertas(gs);
+  var fechadas = (gs.itens||[]).filter(function(x){ return x.status!=="aberta"; }).slice(-8).reverse();
+  var html = '<p class="adm-note">Um território com dono só muda de mãos por guerra. Cada lado conduz campanhas nas próprias aventuras (o Mestre narra a cena, o motor rola o dado) e, no fim do prazo, o confronto decisivo é resolvido em melhor de três — quem defende leva a fortificação do território como bônus.</p>';
+
+  html += '<h4 style="margin:14px 0 6px;color:var(--text-hi);font-size:12.5px;">⚔️ Em curso</h4>';
+  if(!abertas.length){
+    html += '<p class="mundo-empty">Nenhuma guerra aberta.</p>';
+  } else {
+    html += abertas.map(function(x){
+      var horas = Math.max(0, Math.round((x.prazo-Date.now())/3600000));
+      var fort = FORTIFICACAO[x.elementoTipo]||0;
+      var t = CANON_TIPOS[x.elementoTipo] || CANON_TIPOS.local;
+      return '<div class="canon-row"><span class="cr-ico">'+t.icone+'</span>'+
+        '<span class="cr-body"><b>'+esc(x.elementoNome)+'</b>'+
+        '<span><span class="canon-tag">ofensiva: '+esc(x.atacante.personagem)+' · nv.'+x.atacante.nivel+' · '+x.atacante.campanhas+'/'+GUERRA_MAX_CAMPANHAS+'</span></span>'+
+        '<span><span class="canon-tag dom">defesa: '+esc(x.defensor.personagem)+' · nv.'+x.defensor.nivel+' · '+x.defensor.campanhas+'/'+GUERRA_MAX_CAMPANHAS+' · fort +'+fort+'</span></span>'+
+        '<span>Confronto decisivo em cerca de '+horas+'h · força atual '+forcaDeGuerra(x.atacante,0)+' contra '+forcaDeGuerra(x.defensor,fort)+'</span></span>'+
+        (ehAdminMundo() ? '<span class="cr-acts"><button class="mk-btn sec" data-guerra-resolver="'+esc(x.id)+'">Resolver agora</button><button class="mk-btn sec" data-guerra-cancelar="'+esc(x.id)+'">Cancelar</button></span>' : '')+
+        '</div>';
+    }).join("");
+  }
+
+  html += '<h4 style="margin:16px 0 6px;color:var(--text-hi);font-size:12.5px;">Desfechos recentes</h4>';
+  if(!fechadas.length){
+    html += '<p class="mundo-empty">Nenhuma guerra concluída ainda.</p>';
+  } else {
+    html += fechadas.map(function(x){
+      if(x.status==="cancelada") return '<div class="canon-row"><span class="cr-ico">🏳️</span><span class="cr-body"><b>'+esc(x.elementoNome)+'</b><span>Guerra cancelada pelo administrador.</span></span></div>';
+      var res = x.resultado || {rodadas:[], vencedor:"defensor"};
+      var venc = x[res.vencedor] || {personagem:"?"};
+      var placar = (res.rodadas||[]).map(function(r){ return r.totalAtacante+"×"+r.totalDefensor; }).join(", ");
+      return '<div class="canon-row"><span class="cr-ico">'+(res.vencedor==="atacante"?"🏴":"🛡️")+'</span>'+
+        '<span class="cr-body"><b>'+esc(x.elementoNome)+'</b>'+
+        '<span><span class="canon-tag dom">'+esc(venc.personagem)+' venceu</span>'+
+        '<span class="canon-tag">'+esc(placar)+'</span>'+
+        '<span class="canon-tag">'+new Date(x.resolvidaEm||x.abertaEm).toLocaleDateString("pt-BR")+'</span></span></span></div>';
+    }).join("");
+  }
+  el("mundo-body").innerHTML = html;
+
+  el("mundo-body").querySelectorAll("[data-guerra-resolver]").forEach(function(b){
+    b.addEventListener("click", async function(){
+      var g = abertas.filter(function(x){ return x.id===b.getAttribute("data-guerra-resolver"); })[0];
+      if(!g) return;
+      if(!confirm("Antecipar o confronto decisivo por "+g.elementoNome+"?\n\nAs campanhas param onde estão e o resultado é definitivo.")) return;
+      b.disabled = true; b.textContent = "Resolvendo…";
+      try{ var r = await resolverGuerra(g); alert(r.aviso); await renderMundo(); }
+      catch(err){ alert("Falha ao resolver: "+(err.message||err)); b.disabled=false; b.textContent="Resolver agora"; }
+    });
+  });
+  el("mundo-body").querySelectorAll("[data-guerra-cancelar]").forEach(function(b){
+    b.addEventListener("click", async function(){
+      var id = b.getAttribute("data-guerra-cancelar");
+      if(!confirm("Cancelar esta guerra? O território fica como está e nenhuma trégua é aplicada.")) return;
+      b.disabled = true;
+      try{
+        await atualizarGuerras(function(g){
+          var alvo = (g.itens||[]).filter(function(x){ return x.id===id; })[0];
+          if(alvo && alvo.status==="aberta"){ alvo.status="cancelada"; alvo.resolvidaEm=Date.now(); }
+        });
+        await renderMundo();
+      }catch(err){ alert("Falha ao cancelar: "+(err.message||err)); b.disabled=false; }
+    });
+  });
+}
+
+function renderMundoRegras(){
+  var gates = obterNiveisDominio();
+  var html = '<p class="adm-note">Nível mínimo para um personagem controlar cada tipo de elemento. O motor confere isso a cada reivindicação e recusa o que estiver abaixo — vale igualmente para o modo síncrono e o assíncrono.</p>';
+  html += '<div style="margin-top:10px;">'+Object.keys(CANON_TIPOS).sort(function(a,b){ return CANON_TIPOS[a].ordem-CANON_TIPOS[b].ordem; }).map(function(t){
+    return '<div class="field" style="margin-bottom:8px;"><label for="regra-'+t+'">'+CANON_TIPOS[t].icone+' '+esc(CANON_TIPOS[t].label)+'</label>'+
+      '<input id="regra-'+t+'" class="text-input" type="number" min="1" max="99" value="'+gates[t]+'"></div>';
+  }).join("")+'</div>';
+  html += '<div class="input-with-btn" style="margin-top:6px;">'+
+    '<button type="button" class="primary-btn" id="regras-salvar" style="flex:1;">Salvar regras</button>'+
+    '<button type="button" class="ghost-btn" id="regras-restaurar">Restaurar padrão</button></div>'+
+    '<p class="hint" id="regras-status"></p>';
+  el("mundo-body").innerHTML = html;
+
+  el("regras-restaurar").addEventListener("click", function(){
+    Object.keys(NIVEL_DOMINIO_PADRAO).forEach(function(t){ if(el("regra-"+t)) el("regra-"+t).value = NIVEL_DOMINIO_PADRAO[t]; });
+  });
+  el("regras-salvar").addEventListener("click", async function(){
+    var btn = el("regras-salvar"); btn.disabled = true; btn.textContent = "Salvando…";
+    try{
+      var novos = {};
+      Object.keys(NIVEL_DOMINIO_PADRAO).forEach(function(t){
+        var v = parseInt((el("regra-"+t)||{}).value, 10);
+        novos[t] = (isFinite(v) && v>0 && v<100) ? v : NIVEL_DOMINIO_PADRAO[t];
+      });
+      var fresh = await sGet("admin-config", true) || {};
+      adminConfig = Object.assign({}, fresh, {niveisDominio: novos});
+      await sSet("admin-config", adminConfig, true);
+      el("regras-status").textContent = "Salvo — vale a partir da próxima reivindicação, sem reiniciar nenhuma aventura.";
+    }catch(err){
+      el("regras-status").textContent = "Falha ao salvar: "+(err.message||err);
+    }finally{ btn.disabled = false; btn.textContent = "Salvar regras"; }
+  });
+}
+
+/* ---- editor / consolidação de um elemento (admin) ---- */
+var canonEditando = null;   // elemento já fixado sendo editado
+var canonPendenteAtual = null; // proposta de origem, se veio da fila
+
+async function abrirEditorCanon(elemento, proposta){
+  canonEditando = elemento || null;
+  canonPendenteAtual = proposta || null;
+  var idx = await carregarCanonIndex();
+  el("canon-edit-titulo").textContent = elemento ? "Editar elemento" : "Fixar no cânone";
+  el("canon-edit-save").textContent = elemento ? "Salvar" : "Fixar no cânone";
+  el("canon-edit-tipo").innerHTML = Object.keys(CANON_TIPOS).sort(function(a,b){ return CANON_TIPOS[a].ordem-CANON_TIPOS[b].ordem; })
+    .map(function(t){ return '<option value="'+t+'">'+CANON_TIPOS[t].icone+' '+esc(CANON_TIPOS[t].label)+'</option>'; }).join("");
+  var possiveisPais = (idx.elementos||[]).filter(function(e){ return !elemento || e.id!==elemento.id; });
+  el("canon-edit-pai").innerHTML = '<option value="">— nenhum —</option>'+
+    possiveisPais.map(function(e){ return '<option value="'+esc(e.id)+'">'+(CANON_TIPOS[e.tipo]||CANON_TIPOS.local).icone+' '+esc(e.nome)+'</option>'; }).join("");
+
+  var base = elemento || proposta || {};
+  el("canon-edit-nome").value = base.nome || "";
+  el("canon-edit-tipo").value = canonTipoValido(base.tipo) || "local";
+  el("canon-edit-resumo").value = base.resumo || "";
+  el("canon-edit-desc").value = "";
+  el("canon-edit-status").textContent = "";
+  el("canon-edit-error").classList.add("hidden");
+
+  if(elemento){
+    try{
+      var entry = await sGet("canon-entry:"+elemento.id, true);
+      if(entry && entry.descricao) el("canon-edit-desc").value = entry.descricao;
+    }catch(e){}
+    el("canon-edit-pai").value = elemento.paiId || "";
+  } else if(proposta && proposta.paiNome){
+    var candidato = (idx.elementos||[]).filter(function(e){ return normaliza(e.nome)===normaliza(proposta.paiNome); })[0];
+    el("canon-edit-pai").value = candidato ? candidato.id : "";
+  }
+  el("canon-edit-overlay").classList.remove("hidden");
+}
+el("canon-edit-close").addEventListener("click", function(){ el("canon-edit-overlay").classList.add("hidden"); });
+el("canon-edit-cancel").addEventListener("click", function(){ el("canon-edit-overlay").classList.add("hidden"); });
+
+/* Assistência da IA: ela só escreve TEXTO (resumo, descrição) e sugere
+   tipo/duplicata. Identidade, id, vínculo e domínio continuam sendo
+   decididos pelo aplicativo e confirmados pelo administrador. */
+el("canon-edit-ia").addEventListener("click", async function(){
+  var btn = el("canon-edit-ia");
+  var nome = el("canon-edit-nome").value.trim();
+  if(!nome){ el("canon-edit-status").textContent = "Dê um nome antes de pedir ajuda à IA."; return; }
+  if(!session.apiKey){ el("canon-edit-status").textContent = "Configure a chave do Gemini para usar a consolidação assistida."; return; }
+  btn.disabled = true; el("canon-edit-status").textContent = "Consultando a IA…";
+  try{
+    var idx = await carregarCanonIndex();
+    var contexto = (idx.elementos||[]).slice(0, 40).map(function(e){
+      return "- ["+(CANON_TIPOS[e.tipo]||CANON_TIPOS.local).label+"] "+e.nome+(e.resumo?": "+String(e.resumo).slice(0,120):"");
+    }).join("\n") || "(cânone vazio)";
+    var sistema = "Você é o curador de um mundo compartilhado de RPG de fantasia. Recebe um elemento candidato e o cânone já existente. "+
+      "Sua tarefa é escrever a ficha canônica desse elemento de forma coerente com o que já existe, e apontar se ele é claramente o MESMO que algum elemento já fixado. "+
+      "Não invente domínios, donos, níveis nem números de regra — isso é do motor do jogo, não seu. "+
+      "Responda SOMENTE com JSON, sem texto antes ou depois:\n"+
+      '{"tipo":"npc"|"faccao"|"local"|"cidade"|"regiao"|"pais"|"mundo","resumo":"uma frase de até 200 caracteres, é o que o Mestre lê","descricao":"2 a 4 parágrafos curtos de ficha","duplicataDe":"nome exato de um elemento do cânone, ou null"}';
+    var usuario = "ELEMENTO CANDIDATO:\nnome: "+nome+
+      "\ntipo sugerido: "+el("canon-edit-tipo").value+
+      "\nresumo atual: "+(el("canon-edit-resumo").value||"(vazio)")+
+      (canonPendenteAtual ? ("\nsurgiu na aventura: "+(canonPendenteAtual.origemAdvNome||"—")) : "")+
+      "\n\nCÂNONE JÁ FIXADO:\n"+contexto;
+    var raw = await callGeminiRaw(sistema, [{role:"user", parts:[{text:usuario}]}]);
+    var slice = sliceJsonObject(raw);
+    if(!slice) throw new Error("a IA respondeu fora do formato esperado");
+    var d = JSON.parse(slice.json);
+    if(canonTipoValido(d.tipo)) el("canon-edit-tipo").value = d.tipo;
+    if(d.resumo) el("canon-edit-resumo").value = String(d.resumo).slice(0,240);
+    if(d.descricao) el("canon-edit-desc").value = String(d.descricao).slice(0,4000);
+    el("canon-edit-status").textContent = d.duplicataDe
+      ? ("⚠️ A IA acha que isto é o mesmo que \""+d.duplicataDe+"\", já no cânone. Confira antes de fixar.")
+      : "Ficha sugerida. Revise e ajuste antes de fixar — a decisão é sua.";
+  }catch(err){
+    el("canon-edit-status").textContent = "Falha ao consultar a IA: "+(err.message||err);
+  }finally{ btn.disabled = false; }
+});
+
+el("canon-edit-save").addEventListener("click", async function(){
+  var btn = el("canon-edit-save");
+  var errBox = el("canon-edit-error"); errBox.classList.add("hidden");
+  var nome = el("canon-edit-nome").value.trim().slice(0,80);
+  var tipo = canonTipoValido(el("canon-edit-tipo").value) || "local";
+  var resumo = el("canon-edit-resumo").value.trim().slice(0,240);
+  var descricao = el("canon-edit-desc").value.trim().slice(0,6000);
+  var paiId = el("canon-edit-pai").value || null;
+  if(!nome){ errBox.textContent = "Dê um nome ao elemento."; errBox.classList.remove("hidden"); return; }
+  btn.disabled = true; btn.textContent = "Salvando…";
+  try{
+    var idAlvo = canonEditando ? canonEditando.id : canonNovoId(tipo);
+    var editando = !!canonEditando;
+    await atualizarCanonIndex(function(ix){
+      ix.elementos = ix.elementos || [];
+      if(editando){
+        var alvo = ix.elementos.filter(function(e){ return e.id===idAlvo; })[0];
+        if(alvo){ alvo.nome=nome; alvo.tipo=tipo; alvo.resumo=resumo; alvo.paiId=paiId; alvo.atualizadoEm=Date.now(); }
+      } else {
+        var colide = ix.elementos.filter(function(e){ return normaliza(e.nome)===normaliza(nome); })[0];
+        if(colide) throw new Error("já existe \""+colide.nome+"\" no cânone. Edite o elemento existente em vez de criar outro.");
+        ix.elementos.push({
+          id: idAlvo, tipo: tipo, nome: nome, resumo: resumo, paiId: paiId,
+          dominio: null, fixadoEm: Date.now(), fixadoPor: session.email,
+          origemAdvId: canonPendenteAtual ? canonPendenteAtual.origemAdvId : null
+        });
+      }
+    });
+    if(descricao) await sSet("canon-entry:"+idAlvo, {id:idAlvo, descricao:descricao, atualizadoEm:Date.now(), por:session.email}, true);
+    if(canonPendenteAtual){
+      var pid = canonPendenteAtual.id;
+      await atualizarCanonPendentes(function(p){ p.itens = (p.itens||[]).filter(function(i){ return i.id!==pid; }); });
+    }
+    logAdminEvent("canon_fixado", {id:idAlvo, nome:nome, tipo:tipo, editando:editando});
+    el("canon-edit-overlay").classList.add("hidden");
+    await renderMundo();
+  }catch(err){
+    errBox.textContent = "Falha ao salvar: "+(err.message||err);
+    errBox.classList.remove("hidden");
+  }finally{ btn.disabled = false; btn.textContent = canonEditando ? "Salvar" : "Fixar no cânone"; }
+});
+
 el("hub-admin").addEventListener("click", openAdmin);
 el("hub-event").addEventListener("click", abrirModalEvento);
 el("hub-market").addEventListener("click", abrirMercado);
