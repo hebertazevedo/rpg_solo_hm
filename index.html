@@ -1932,10 +1932,16 @@ var partyCache = {}; // email -> character
 function isSyncedKey(key){
  // TODA chave compartilhada precisa estar aqui, senao o dado fica preso no
  // navegador de quem criou e mais ninguem enxerga.
+ // Fase 10/11 (set/2026): o mundo compartilhado nasceu com este bug — as
+ // chaves canon-* e guerras nao estavam nesta lista, entao sSet(..., true)
+ // caia no ramo local e nada persistia, nem o que a aventura criava nem o
+ // que o admin fixava na interface. acquireLock nao mascara isso porque
+ // fala com o Firestore direto, via fsTransactionUpdate: a trava era
+ // obtida e a gravacao seguinte se perdia em silencio.
  // P3 (nova auditoria, seção 19 — presença/"digitando"): presence: e
  // typing: também precisam sincronizar, senão cada jogador só vê a
  // própria presença/digitação, nunca a dos outros.
- return /^(pub:|character:|adv:|member-adv:|scene-msgs:|pending-action:|check:|admin-config|event:|events-index|event-log:|market:|market-index|market-treasury|crafted:|producao:|ledger:|forge-chat:|turno:|iteminfo:|producao:|subscription:|upgrade-request:|presence:|typing:|cycle:|cycle-lock:|cycle-result:|cycle-result-index:|order:|orders-index:|payment:|payment-unmatched:)/.test(key);
+ return /^(pub:|character:|adv:|member-adv:|scene-msgs:|pending-action:|check:|admin-config|event:|events-index|event-log:|market:|market-index|market-treasury|crafted:|producao:|ledger:|forge-chat:|turno:|iteminfo:|producao:|subscription:|upgrade-request:|presence:|typing:|cycle:|cycle-lock:|cycle-result:|cycle-result-index:|order:|orders-index:|payment:|payment-unmatched:|canon-index|canon-entry:|canon-pend|canon-log|canon-lock:|guerras)/.test(key);
 }
 /* Values are stored wrapped as {__v:rev, __t:ts, d:data} so a stale or failed
  remote write can never overwrite newer local data on screen. */
@@ -2607,9 +2613,13 @@ async function atualizarCanonIndex(mutador){
   try{
     var idx = await sGet("canon-index", true);
     if(!idx || !Array.isArray(idx.elementos)) idx = {v:1, elementos:[], atualizadoEm:0};
+    var anterior = clonar(idx);
     var r = mutador(idx);
     idx.atualizadoEm = Date.now();
     await sSet("canon-index", idx, true);
+    try{
+      await confirmarGravacaoCompartilhada("canon-index", idx.atualizadoEm, anterior);
+    }catch(err){ canonIndexCache = null; canonIndexCacheAt = 0; throw err; }
     canonIndexCache = idx; canonIndexCacheAt = Date.now();
     return r === undefined ? idx : r;
   } finally { await releaseLock(lockKey); }
@@ -2621,10 +2631,12 @@ async function atualizarCanonPendentes(mutador){
   try{
     var p = await sGet("canon-pend", true);
     if(!p || !Array.isArray(p.itens)) p = {itens:[], atualizadoEm:0};
+    var anteriorPend = clonar(p);
     var r = mutador(p);
     if(p.itens.length > CANON_MAX_PENDENTES) p.itens = p.itens.slice(-CANON_MAX_PENDENTES);
     p.atualizadoEm = Date.now();
     await sSet("canon-pend", p, true);
+    await confirmarGravacaoCompartilhada("canon-pend", p.atualizadoEm, anteriorPend);
     return r === undefined ? p : r;
   } finally { await releaseLock(lockKey); }
 }
@@ -2869,7 +2881,14 @@ async function processarMundoCompartilhado(adv, data){
   if(!adv || !data) return res;
   try{
     if(advAlimentaCanon(adv)){
-      res.propostas = await registrarPropostasDeCanon(adv, coletarPropostasDoTurno(adv, data)) || 0;
+      // Isolado do resto: se a fila de curadoria recusar a gravação, isso não
+      // pode derrubar a contagem de campanhas nem o julgamento de domínios.
+      try{
+        res.propostas = await registrarPropostasDeCanon(adv, coletarPropostasDoTurno(adv, data)) || 0;
+      }catch(err){
+        console.warn("Mundo compartilhado: as propostas deste turno não foram salvas —", err);
+        res.avisos.push("⚠️ O que esta cena criou não pôde ser enviado à curadoria do mundo agora. A narrativa segue normalmente; tente de novo no próximo turno.");
+      }
     }
     // Fase 11, na ordem que importa: primeiro fecha o que já venceu (para
     // que uma reivindicação nova não esbarre numa guerra fantasma), depois
@@ -2877,8 +2896,10 @@ async function processarMundoCompartilhado(adv, data){
     var venc = await resolverGuerrasVencidas();
     var camp = await registrarAcoesDeGuerra(adv, data.acoesDeGuerra);
     var jul = await validarReivindicacoesDominio(adv, data.dominiosReivindicados);
-    res.avisos = venc.avisos.concat(camp.avisos, jul.avisos);
-    res.eventos = venc.eventos.concat(camp.eventos, jul.eventos);
+    // concat SOBRE o que já está em res: a colheita acima pode ter deixado
+    // um aviso aqui, e reatribuir apagaria justamente o alerta de falha.
+    res.avisos = res.avisos.concat(venc.avisos, camp.avisos, jul.avisos);
+    res.eventos = res.eventos.concat(venc.eventos, camp.eventos, jul.eventos);
   }catch(err){
     console.warn("Mundo compartilhado: falha ao processar o turno —", err);
   }
@@ -2913,6 +2934,36 @@ function forcaDeGuerra(lado, fortificacao){
   return modGuerra(lado.nivel) + (lado.campanhas||0)*2 + (fortificacao||0);
 }
 
+/* Confirma que a gravação chegou mesmo ao Firestore.
+
+   sSet() grava no servidor sem esperar (fire-and-forget) e devolve o
+   resultado da gravação LOCAL — de propósito, para não travar a
+   interface durante o jogo. Só que, para o cânone, isso esconde
+   exatamente a falha que importa: se as regras de segurança recusarem o
+   documento, o admin vê "fixado no cânone" e no dia seguinte não há
+   nada. Aqui a gravação é rara (curadoria, mudança de domínio, guerra),
+   então vale pagar uma leitura para confirmar e falhar alto. */
+async function confirmarGravacaoCompartilhada(key, carimbo, anterior){
+  var chegou = false;
+  if(useFirestore()){
+    for(var tentativa=0; tentativa<3 && !chegou; tentativa++){
+      await new Promise(function(r){ setTimeout(r, 250*(tentativa+1)); });
+      var remoto = await fsGet(key);
+      if(remoto===FS_ERROR) continue;
+      if(remoto && unwrap(remoto) && unwrap(remoto).atualizadoEm===carimbo) chegou = true;
+    }
+  } else {
+    chegou = true; // sem Firestore não há o que confirmar
+  }
+  if(chegou) return true;
+  // Desfaz a cópia local: se o servidor recusou, o navegador não pode
+  // continuar exibindo um elemento que ninguém mais tem. Era assim que o
+  // cânone "sumia no dia seguinte" em vez de nunca aparecer.
+  cacheInvalidate(key);
+  try{ if(anterior!==undefined) await sSet(key, anterior, true); }catch(e){}
+  throw new Error("a gravação não chegou ao servidor (verifique as regras do Firestore para a chave \""+key+"\" e sua conexão). Nada foi salvo.");
+}
+
 async function carregarGuerras(){
   var g = await sGet("guerras", true);
   if(!g || !Array.isArray(g.itens)) g = {itens:[], atualizadoEm:0};
@@ -2925,10 +2976,12 @@ async function atualizarGuerras(mutador){
   try{
     var g = await sGet("guerras", true);
     if(!g || !Array.isArray(g.itens)) g = {itens:[], atualizadoEm:0};
+    var anteriorGuerras = clonar(g);
     var r = mutador(g);
     g.itens = g.itens.slice(-GUERRA_MAX_HISTORICO);
     g.atualizadoEm = Date.now();
     await sSet("guerras", g, true);
+    await confirmarGravacaoCompartilhada("guerras", g.atualizadoEm, anteriorGuerras);
     return r === undefined ? g : r;
   } finally { await releaseLock(lockKey); }
 }
