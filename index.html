@@ -1059,6 +1059,7 @@ a{color:var(--arcane-bright);}
    </div>
    <p class="async-cycle-hint" id="async-cycle-hint"></p>
    <button type="button" class="secondary-btn hidden" id="async-resolver-agora" style="width:100%;margin-top:10px;">▶ Resolver o dia agora</button>
+   <button type="button" class="ghost-btn hidden" id="async-encerrar" style="width:100%;margin-top:8px;">⛔ Encerrar a aventura</button>
   </div>
   <div class="async-section" id="async-abertura-section">
    <div class="async-section-head">
@@ -2033,6 +2034,15 @@ async function sSet(key, value, shared){
  if(window.storage){ await window.storage.set(key, JSON.stringify(wrapped), !!shared); ok = true; }
  }catch(e){ console.warn("storage set failed", key, e); }
    if(shared && isSyncedKey(key)){
+    // Bug (set/2026): "ok" refletia SO a gravacao local. Onde window.storage
+    // nao existe — que e o caso do app publicado, fora do ambiente de
+    // artifacts — sSet() devolvia false mesmo gravando certinho no
+    // Firestore. Quem confiasse nesse retorno concluia que a gravacao
+    // falhou. Era isso que travava a aventura assincrona no dia 1
+    // (ver getOrCreateCycle). Uma chave sincronizada despachada ao
+    // servidor conta como gravada; a confirmacao de verdade, quando
+    // importa, e feita por confirmarGravacaoCompartilhada().
+    ok = true;
     // não trava a interface esperando a ida ao servidor, mas se a gravação for
     // recusada (regras de segurança) o cache local não pode continuar mentindo
     sheetsPut("kv", key, wrapped).then(function(okRemoto){
@@ -6284,7 +6294,16 @@ async function getOrCreateCycle(adv){
   var advFresh = await sGet("adv:"+advId, true) || adv;
   var janela = limitesDoCiclo(diaStr);
   var participantes = (advFresh.members||[]).filter(function(m){ return m.status==="confirmado"; }).map(function(m){ return m.email; });
-  var numero = (advFresh.cycleCount||0) + 1;
+  // Autorreparo: aventuras que rodaram com o bug acima ficaram com
+  // cycleCount preso em 1 enquanto o historico ja tem varios dias
+  // resolvidos. Tomar o maior entre os dois faz a contagem voltar ao
+  // lugar sozinha, sem migracao manual.
+  var maiorNoHistorico = 0;
+  try{
+    var histIdx = await sGet(historicoIndexKey(advId), true) || [];
+    histIdx.forEach(function(e){ if(e && e.cycleNumber>maiorNoHistorico) maiorNoHistorico = e.cycleNumber; });
+  }catch(e){ console.warn("Nao foi possivel ler o historico para numerar o ciclo:", e); }
+  var numero = Math.max(advFresh.cycleCount||0, maiorNoHistorico) + 1;
   ciclo = {
     cycleId: diaStr, advId: advId, cycleNumber: numero, status:"collecting",
     openedAt: janela.openedAt, closesAt: janela.closesAt, resolvesAt: janela.resolvesAt,
@@ -6293,8 +6312,12 @@ async function getOrCreateCycle(adv){
     resolutionStartedAt:null, resolvedAt:null, lastError:null, updatedAt: Date.now(),
     abertura: null // contextualização do Mestre — preenchida logo abaixo, se possível
   };
-  var ok = await sSet(key, ciclo, true);
-  if(ok){
+  await sSet(key, ciclo, true);
+  // Sem condicional: a numeracao do ciclo NAO pode depender do retorno de
+  // sSet(). Se a gravacao do ciclo falhar de verdade, o pior caso e uma
+  // aventura com o contador adiantado — muito melhor que reabrir o dia 1
+  // e o Mestre propor uma aventura nova por cima da que esta em curso.
+  {
     advFresh.currentCycleId = diaStr; advFresh.cycleCount = numero; advFresh.updatedAt = Date.now();
     await sSet("adv:"+advId, advFresh, true);
     // Todo turno (e a aventura, no ciclo nº1) começa com a contextualização
@@ -7051,6 +7074,13 @@ async function refreshAsyncDesk(){
   // no valor de quando a tela abriu — era exatamente isso que fazia a
   // numeração do ciclo voltar pra 1 toda vez.
   currentAdv = await sGet("adv:"+currentAdv.id, true) || currentAdv;
+  // Aventura encerrada pelo host: nao abre um novo dia. Sem isto, a tela
+  // continuaria criando ciclos e o Mestre seguiria contextualizando dias
+  // de uma aventura que ja acabou.
+  if(currentAdv.status==="encerrada"){
+    renderAsyncEncerrada();
+    return;
+  }
   var ciclo = await getOrCreateCycle(currentAdv);
   ciclo = await fecharCicloSeNecessario(currentAdv.id, ciclo);
   // Sem o scheduler real da Fase 6, é o próprio cliente que dispara a
@@ -7081,7 +7111,41 @@ async function refreshAsyncDesk(){
   var podeResolverAgora = souHost && ciclo && (ciclo.status==="collecting" || ciclo.status==="closing" || cicloResolvendoTravado(ciclo));
   resolverBtn.classList.toggle("hidden", !podeResolverAgora);
   resolverBtn.textContent = cicloResolvendoTravado(ciclo) ? "▶ Tentar resolver de novo (travou)" : "▶ Resolver o dia agora";
+  var encerrarBtn = el("async-encerrar");
+  encerrarBtn.classList.toggle("hidden", !(souHost && currentAdv.status==="ativa"));
 }
+
+/* Encerramento pelo host. "encerrada" ja era um estado previsto no resto
+   do app (o hub mostra a aventura como concluida, o chat some, a tela de
+   jogo vira somente leitura) — so nao havia como chegar nele numa
+   aventura em andamento. O historico e o diario continuam acessiveis. */
+async function encerrarAventura(advId){
+  var fresh = await sGet("adv:"+advId, true);
+  if(!fresh) throw new Error("Aventura não encontrada.");
+  if(normEmail(fresh.hostEmail)!==normEmail(session.email)) throw new Error("Só quem criou a aventura pode encerrá-la.");
+  if(fresh.status==="encerrada") return fresh;
+  fresh.status = "encerrada";
+  fresh.encerradaEm = Date.now();
+  fresh.encerradaPor = normEmail(session.email);
+  fresh.updatedAt = Date.now();
+  await sSet("adv:"+advId, fresh, true);
+  return fresh;
+}
+
+el("async-encerrar").addEventListener("click", async function(){
+  if(!currentAdv) return;
+  var btn = el("async-encerrar");
+  if(!confirm("Encerrar \""+(currentAdv.name||"esta aventura")+"\"?\n\nNinguém poderá enviar novas ordens e nenhum novo dia será aberto. O histórico e os diários continuam disponíveis para leitura. Isso não pode ser desfeito pelo app.")) return;
+  btn.disabled = true; btn.textContent = "Encerrando…";
+  try{
+    currentAdv = await encerrarAventura(currentAdv.id);
+    mostrarToastAsync("Aventura encerrada.");
+    enterHub();
+  }catch(err){
+    alert("Falha ao encerrar: "+(err.message||err));
+    btn.disabled = false; btn.textContent = "⛔ Encerrar a aventura";
+  }
+});
 
 /* Contextualização do Mestre (ver gerarAberturaDeCiclo) — narrativa de
    abertura do turno + o que cada jogador deveria considerar fazer hoje. */
@@ -7183,6 +7247,25 @@ function verificarAlertasPrazo(ciclo){
     }
   });
 }
+/* Tela do ciclo quando a aventura foi encerrada: somente leitura, com o
+   histórico ainda a um clique de distância. */
+function renderAsyncEncerrada(){
+  el("async-subtitle").textContent = "Aventura concluída";
+  el("async-cycle-badge").textContent = "Concluída";
+  el("async-cycle-countdown").textContent = "—";
+  el("async-cycle-hint").textContent = "Esta aventura foi encerrada"+
+    (currentAdv.encerradaEm ? " em "+new Date(currentAdv.encerradaEm).toLocaleDateString("pt-BR") : "")+
+    ". Nenhum novo dia será aberto e não é possível enviar ordens. O histórico continua disponível.";
+  el("async-resolver-agora").classList.add("hidden");
+  el("async-encerrar").classList.add("hidden");
+  el("async-new-order").classList.add("hidden");
+  el("async-ask-gm").classList.add("hidden");
+  el("async-gerar-abertura").classList.add("hidden");
+  el("async-abertura-section").classList.add("hidden");
+  el("async-decisions-list").innerHTML = '<p class="empty-hint">Aventura encerrada.</p>';
+  el("async-orders-list").innerHTML = '<p class="empty-hint">Aventura encerrada.</p>';
+}
+
 /* Toast dentro da tela do ciclo assíncrono — mesmo espírito do
    showXpToast() do jogo síncrono, mas anexado ao layout assíncrono. */
 function mostrarToastAsync(mensagem){
